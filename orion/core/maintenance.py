@@ -59,9 +59,41 @@ async def weekly_briefing() -> dict:
     return {"summary": text, "stats": s}
 
 
+def _summary() -> dict:
+    """Headline numbers for the Conductor's card: what its passes are keeping in order."""
+    s = world_model.stats()
+    return {
+        "pending": s.get("pending_reviews", 0),
+        "metrics": [
+            {"label": "entities", "value": s.get("entities", 0)},
+            {"label": "knowledge", "value": s.get("knowledge", 0)},
+            {"label": "links", "value": s.get("relationships", 0)},
+            {"label": "events", "value": s.get("events", 0)},
+        ],
+    }
+
+
 def register_core_jobs() -> None:
-    from orion.core.scheduler import scheduler, ScheduledJob, configured_cron
-    scheduler.register(ScheduledJob("consolidate",
-                                    configured_cron("consolidate", "0 3 * * *"), consolidate))
-    scheduler.register(ScheduledJob("weekly_briefing",
-                                    configured_cron("weekly_briefing", "0 8 * * 1"), weekly_briefing))
+    """Register the Conductor and the two core passes it runs.
+
+    Named Conductor rather than Orchestrator on purpose: ``orchestrator.py`` is the per-turn
+    reasoning pipeline, and one word should not mean two things in the same system. The
+    Conductor keeps the world model in order between turns.
+    """
+    from orion.core import plugin_sdk as orion
+
+    orion.add_agent(
+        "conductor", "Conductor",
+        tagline="World model",
+        blurb="Keeps the world model in order between conversations — merges what it finds is "
+              "duplicated, re-reads recent chats for knowledge worth keeping, and writes you a "
+              "weekly account of what it holds. Every finding waits in your inbox.",
+        icon="compass", accent="observation", order=10, summary=_summary)
+
+    orion.add_job("consolidate", "0 3 * * *", consolidate, agent="conductor",
+                  label="Consolidate",
+                  description="Finds duplicate entities and re-reads recent conversations for "
+                              "knowledge worth keeping.")
+    orion.add_job("weekly_briefing", "0 8 * * 1", weekly_briefing, agent="conductor",
+                  label="Weekly briefing",
+                  description="Sums up what the world model holds and files it as a discovery.")

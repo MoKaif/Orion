@@ -1,10 +1,20 @@
 {
   "//": "Background lifecycle. Idle-by-default in spirit: cheap jobs, gated behind foreground.",
+  "//2": "Every job belongs to an agent (GET /api/agents) and appears on that agent's page.",
+  "//3": "These are the shipped defaults. Anything retuned from an agent's page is written to",
+  "//4": "config/jobs.local.json (gitignored) and merged over this file, so machine tuning is",
+  "//5": "never a diff in a release. 'limit' = how much one run does; omitted where meaningless.",
   "enabled": true,
   "tick_seconds": 60,
   "jobs": {
-    "index_vault":     { "enabled": true, "cron": "0 * * * *",  "//": "hourly" },
-    "consolidate":     { "enabled": true, "cron": "0 3 * * *",  "//": "nightly 03:00" },
-    "weekly_briefing": { "enabled": true, "cron": "0 8 * * 1",  "//": "Mondays 08:00" }
+    "consolidate":      { "enabled": true, "cron": "0 3 * * *",  "//": "Conductor · nightly 03:00" },
+    "weekly_briefing":  { "enabled": true, "cron": "0 8 * * 1",  "//": "Conductor · Mondays 08:00" },
+
+    "curate_vault":     { "enabled": true, "cron": "0 3 * * *",  "limit": 5, "//": "Curator · grammar" },
+    "build_registry":   { "enabled": true, "cron": "15 3 * * *", "limit": 8, "//": "Curator · entity registry" },
+    "grow_memory":      { "enabled": true, "cron": "30 3 * * *", "limit": 8, "//": "Curator · journal to memory" },
+    "weave_graph":      { "enabled": true, "cron": "45 3 * * *", "limit": 8, "//": "Curator · backlinks" },
+    "curator_backfill": { "enabled": true, "cron": "0 4 * * *",  "limit": 8, "//": "Curator · a slice of every pass" },
+    "index_vault":      { "enabled": true, "cron": "0 * * * *",  "//": "Curator · hourly search index" }
   }
 }

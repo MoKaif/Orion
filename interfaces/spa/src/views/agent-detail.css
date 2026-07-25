@@ -1,13 +1,303 @@
-.agent-meta-row {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 8px 36px;
-}
-.agent-meta-row dt {
-  flex-basis: auto;
-}
-.run-badge.idle {
+/* One agent's page: who it is, the passes it runs with their controls, then its own panels. */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.06em;
   color: var(--faint);
+  margin-bottom: 18px;
+}
+.back:hover {
+  color: var(--accent);
+}
+
+.ap-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.ap-mark {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.ap-id {
+  min-width: 0;
+}
+.ap-tagline {
+  font: 600 9.5px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 3px 0 7px;
+}
+.ap-id h1 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+.ap-blurb {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+  max-width: 68ch;
+}
+
+/* the agent's own numbers, plus its working day */
+.ap-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px 30px;
+  flex-wrap: wrap;
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.ap-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ap-metric b {
+  font: 500 22px/1 var(--serif);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.ap-metric span {
+  font: 500 9.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.ap-shift {
+  flex: 1 1 240px;
+  min-width: 200px;
+  margin-left: auto;
+}
+.ap-shift .shift {
+  padding-top: 0;
+}
+
+.ap-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 500;
+  margin: 26px 0 13px;
+}
+.ap-section-act {
+  margin-left: auto;
+}
+
+/* ---- passes ------------------------------------------------------------ */
+.pass-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pass {
+  border: 1px solid var(--line);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 50%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  padding: 15px 17px 13px;
+  box-shadow: var(--shadow-sm);
+}
+.pass.is-paused {
+  border-left-color: var(--line-2);
+  background: var(--bg-2);
+}
+.pass.is-paused .pass-head h3,
+.pass.is-paused .pass-what {
+  color: var(--muted);
+}
+
+.pass-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.pass-head h3 {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  font-weight: 500;
+  margin: 0;
+}
+.pass-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--inset);
+  white-space: nowrap;
+}
+.pass-state.ps-ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+.pass-state.ps-busy,
+.pass-state.ps-queued {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+.pass-state.ps-failed {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+.pass-run {
+  margin-left: auto;
+}
+
+.pass-what {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+/* the control line: everything tunable about this pass, in one row */
+.pass-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px 22px;
+  flex-wrap: wrap;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px dotted var(--line-2);
+}
+.ctl {
+  display: grid;
+  grid-template-areas: "label input" "hint hint";
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 4px 9px;
+}
+.ctl-label {
+  grid-area: label;
+  font: 500 9.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.ctl-input {
+  grid-area: input;
+  background: var(--inset);
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  color: var(--fg);
+  font: 500 12px/1 var(--mono);
+  padding: 6px 8px;
+  transition: border-color 0.14s;
+}
+.ctl-input:hover {
+  border-color: var(--line-2);
+}
+.ctl-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.ctl-input.cron {
+  width: 104px;
+  letter-spacing: 0.06em;
+}
+.ctl-input.num {
+  width: 62px;
+}
+.ctl-hint {
+  grid-area: hint;
+  font: 500 10.5px/1.3 var(--mono);
+  color: var(--faint);
+}
+
+.pass-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 10px/1 var(--mono);
+  color: var(--ok);
+}
+.pass-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+
+.pass-result {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 11px 0 0;
+  font: 500 10.5px/1.4 var(--mono);
+  color: var(--faint);
+}
+.pass-result span {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  flex: none;
+}
+.pass-result code {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* the dotted ledger leader, borrowed from the archive's index cards */
+.leader {
+  flex: 1 1 auto;
+  min-width: 14px;
+  border-bottom: 1px dotted var(--line-2);
+  transform: translateY(-3px);
+}
+
+@media (max-width: 640px) {
+  .pass-head {
+    flex-wrap: wrap;
+  }
+  .pass-run {
+    margin-left: 0;
+    order: 3;
+  }
+  .pass-right {
+    margin-left: 0;
+  }
+  .ap-shift {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctl-input {
+    transition: none;
+  }
 }
 
 .proposal-list {

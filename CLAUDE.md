@@ -108,7 +108,16 @@ cost-appropriate provider → stream → persist → extract candidate knowledge
 `POST /reviews/{id}` · `POST /confirm/{id}` · `/tools` · `/specialists` · `/jobs` +
 `POST /jobs/{name}/run` · `POST /ingest/vault`
 
-## M4 web UI (2nd overhaul done) — where things live
+## The UI: React SPA is what's served; Jinja lives at `/legacy`
+
+`GET /` serves `interfaces/spa/dist` when it's built (the Dockerfile builds it in a Node stage),
+falling back to the Jinja shell otherwise; the old HTMX mission control stays reachable at
+`/legacy`. The SPA (`interfaces/spa/`, React + react-router + react-query + lucide, vendored
+tokens in `src/styles/tokens.css`) consumes the `/api/*` JSON routes; the `/ui/*` fragment routes
+still serve `/legacy`. **After changing SPA source, run `pnpm build` in `interfaces/spa`** or the
+served bundle stays stale (`dist/` is gitignored and rebuilt in Docker).
+
+## M4 web UI (Jinja, now `/legacy`) — where things live
 
 `interfaces/web/` — design identity is **"Obsidian Archive"**: a digital card catalog
 (obsidian green-black base, copper accent, serif display titles, index-card tabs on cards,
@@ -126,14 +135,41 @@ workaround); Starlette's `TemplateResponse` takes `(request, name, context)`.
 ## M5 plugin SDK (done) — the completion of the platform
 
 `orion/core/plugin_sdk.py` is the **one stable surface** a plugin's `register()` builds against;
-plugins never import core registries directly. It covers all six Manifesto §9 extension points:
-`add_tool` · `add_specialist` · `add_entity_type`/`add_relationship_type` (→ `world_model/types.py`
-registry) · `add_job` · `add_widget` (→ `core/widgets.py`, rendered in the dashboard's plugin
-strip) · plus a module-level `router` a plugin exports, mounted at `/plugins/<name>`. The loader
-(`plugins.py`) auto-registers manifest-declared types, mounts routers, and warns on
-declared-vs-registered drift. Scaffolder: `python -m orion create-plugin <name>`. New endpoints:
-`/plugins` (contributions) · `/types` (world-model vocabulary). The `knowledge` plugin is the
-reference implementation (rides entirely on the SDK).
+plugins never import core registries directly. It covers every Manifesto §9 extension point:
+`add_tool` · `add_specialist` · `add_agent` · `add_entity_type`/`add_relationship_type` (→
+`world_model/types.py` registry) · `add_job` · `add_widget` (→ `core/widgets.py`, rendered in the
+dashboard's plugin strip) · plus a module-level `router` a plugin exports, mounted at
+`/plugins/<name>`. The loader (`plugins.py`) auto-registers manifest-declared types, mounts
+routers, and warns on declared-vs-registered drift (including declared `agents`). Scaffolder:
+`python -m orion create-plugin <name>` — generates a working tool **and** an agent with one
+batched job. New endpoints: `/plugins` (contributions) · `/types` (world-model vocabulary). The
+`knowledge` plugin is the reference implementation (rides entirely on the SDK).
+
+## Agents (revamped) — the unit the user sees
+
+An **agent** is a named worker that owns background jobs and gets a card on `/agents` plus its own
+page. `orion/core/agents.py` is the registry (`Agent`: title, tagline, blurb, icon, `accent` ∈
+copper/fact/observation/idea, order, optional `summary()`/`detail()` callbacks, both called
+defensively). Core ships **Conductor** (`maintenance.py` — consolidate + weekly briefing; named
+Conductor because `orchestrator.py` already means the per-turn pipeline). The curator plugin ships
+**Curator** (its five passes + `knowledge`'s `index_vault`, which declares `agent="curator"`).
+There is no hardcoded job→agent map in core any more — a third agent is one `add_agent` call.
+
+- `ScheduledJob` carries `agent` · `label` · `description` · `limit_default`; unknown agent names
+  fall back to the Conductor. `job_limit(name, default)` is read **at run time**, so a batch-size
+  change applies to the next run without a restart.
+- API: `GET /api/agents` (cards) · `GET /api/agents/{agent}` (page: jobs + summary + the agent's
+  own panels) · `POST /api/agents/{agent}/jobs/{job}/run` (queues, returns at once) ·
+  `PATCH /api/agents/{agent}/jobs/{job}` (`enabled`/`cron`/`limit`; validates cron, writes the
+  **gitignored `config/jobs.local.json` overlay**, reschedules live). `POST /jobs/{name}/run` still
+  runs synchronously for scripts.
+- Manual runs go through the gate as **non-preemptible** (they wait for an in-flight chat turn
+  instead of being cancelled), with an honest `queued → running → idle` state on the job.
+- `config.section()` now merges `<name>.local.json` over the tracked `<name>.json`; UI tuning goes
+  to the overlay via `config.update_local()` so it never lands in a release diff.
+- SPA views: `views/Agents.tsx` (cards only, no run buttons) → `views/AgentDetail.tsx` (run +
+  per-pass schedule/batch/pause controls, the agent's panels, merged run log). `components/shift.tsx`
+  draws the 24-hour **shift strip** from each job's cron (`src/cron.ts` parses/describes it).
 
 ## Curator plugin (v1 done)
 

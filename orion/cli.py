@@ -25,10 +25,11 @@ def _manifest(name: str) -> str:
         "name": name,
         "version": "0.1.0",
         "specialists": [],
+        "agents": [name],
         "tools": [f"{name}_hello"],
         "entity_types": [],
         "relationship_types": [],
-        "background_jobs": [],
+        "background_jobs": [{"name": f"{name}_sweep", "cron": "0 5 * * *"}],
         "api_routes": [],
         "dashboard_widgets": [],
         "permissions": [],
@@ -36,11 +37,12 @@ def _manifest(name: str) -> str:
 
 
 def _init_py(name: str) -> str:
-    return f'''"""{name.capitalize()} plugin — scaffolded by `python -m orion create-plugin {name}`.
+    title = name.capitalize()
+    return f'''"""{title} plugin — scaffolded by `python -m orion create-plugin {name}`.
 
-Wire tools / specialists / jobs / entity types / widgets here through the SDK, then declare
-them in manifest.json so mission control can introspect them. Export a module-level `router`
-(a FastAPI APIRouter) to add API routes under /plugins/{name}. See plugins/README.md.
+Wire tools / specialists / agents / jobs / entity types / widgets here through the SDK, then
+declare them in manifest.json so mission control can introspect them. Export a module-level
+`router` (a FastAPI APIRouter) to add API routes under /plugins/{name}. See plugins/README.md.
 """
 from orion.core import plugin_sdk as orion
 
@@ -48,6 +50,30 @@ from orion.core import plugin_sdk as orion
 def register() -> None:
     from .tools import HelloTool
     orion.add_tool(HelloTool())
+
+    # An agent is what the user sees on the Agents view: a named worker owning the passes
+    # below. Give it a real blurb — it's the first thing read about this plugin.
+    orion.add_agent(
+        "{name}", "{title}",
+        tagline="{title}",
+        blurb="What {title} looks after, and what it will never change without asking you.",
+        icon="bot", accent="idea", plugin="{name}", order=100, summary=_summary)
+
+    orion.add_job("{name}_sweep", "0 5 * * *", _sweep, agent="{name}",
+                  label="Daily sweep",
+                  description="Replace with what one run of this pass actually does.",
+                  limit_default=10)
+
+
+async def _sweep() -> dict:
+    """One run of the pass. Keep it bounded — `orion.job_limit` is the user's dial for that."""
+    limit = orion.job_limit("{name}_sweep", 10)
+    return {{"ok": True, "checked": 0, "limit": limit}}
+
+
+def _summary() -> dict:
+    """Headline numbers for this agent's card. Called defensively — may return {{}}."""
+    return {{"pending": 0, "metrics": [{{"label": "nothing yet", "value": 0}}]}}
 '''
 
 
@@ -80,7 +106,8 @@ def create_plugin(name: str) -> int:
     (plugin_dir / "__init__.py").write_text(_init_py(name))
     (plugin_dir / "tools.py").write_text(_tools_py(name))
     print(f"created plugins/{name}/  (manifest.json, __init__.py, tools.py)")
-    print(f"it loads on next start — try `{name} hello` in chat, or GET /plugins.")
+    print(f"it loads on next start — try `{name} hello` in chat, see GET /plugins,")
+    print(f"and find its agent card at /agents/{name}.")
     return 0
 
 

@@ -25,18 +25,79 @@ router = APIRouter()
 def register() -> None:
     from . import engine
 
-    # the four passes, staggered in the small hours (idle-by-default, all retunable in jobs.json)
-    orion.add_job("curate_vault", "0 3 * * *", lambda: engine.scan(limit=5))
-    orion.add_job("build_registry", "15 3 * * *", lambda: engine.build_registry(limit=8))
-    orion.add_job("grow_memory", "30 3 * * *", lambda: engine.grow_memory(limit=8))
-    orion.add_job("weave_graph", "45 3 * * *", lambda: engine.weave_backlinks(limit=8))
-    orion.add_job("curator_backfill", "0 4 * * *", lambda: engine.backfill(per_pass=8))
+    orion.add_agent(
+        "curator", "Curator",
+        tagline="Obsidian vault",
+        blurb="Reads your vault the way an editor would: fixes the prose, learns the cast, links "
+              "the notes together, and mines your journal for things worth remembering. Nothing "
+              "reaches a note or your world model until you approve it.",
+        icon="book-open", accent="copper", plugin="curator", order=20,
+        summary=_summary, detail=_detail)
+
+    # the passes, staggered in the small hours (idle-by-default; cron + batch size retunable
+    # per job from the Curator's page, which writes config/jobs.local.json)
+    def pass_job(name: str, cron: str, fn, default_limit: int, label: str, description: str):
+        orion.add_job(name, cron,
+                      lambda: fn(orion.job_limit(name, default_limit)),
+                      agent="curator", label=label, description=description,
+                      limit_default=default_limit)
+
+    pass_job("curate_vault", "0 3 * * *", engine.scan, 5, "Grammar & spelling",
+             "Proposes spelling and punctuation fixes for notes that changed, skipping "
+             "templates, quotes and code.")
+    pass_job("build_registry", "15 3 * * *", engine.build_registry, 8, "Entity registry",
+             "Learns the people, places and projects your notes talk about, and offers a hub "
+             "note once one appears three times.")
+    pass_job("grow_memory", "30 3 * * *", engine.grow_memory, 8, "Journal → memory",
+             "Mines dated journal entries for durable facts and queues them for your review.")
+    pass_job("weave_graph", "45 3 * * *", engine.weave_backlinks, 8, "Backlinks",
+             "Proposes [[wikilinks]] between notes so the graph view fills in. Uses approved "
+             "entities only.")
+    orion.add_job("curator_backfill", "0 4 * * *",
+                  lambda: engine.backfill(orion.job_limit("curator_backfill", 8)),
+                  agent="curator", label="Backfill",
+                  description="Runs one slice of every pass above, to work the backlog down "
+                              "over a few nights.",
+                  limit_default=8)
 
     # world-model vocabulary this plugin contributes (person/project are core already)
     orion.add_entity_type("place", "A location the user visits or references.", plugin="curator")
     orion.add_entity_type("org", "A company or organization in the user's life.", plugin="curator")
 
     orion.add_widget("vault_curation", "Curator", _render_widget, plugin="curator")
+
+
+# -- what mission control shows for this agent -----------------------------
+def _summary() -> dict:
+    """Headline numbers for the Curator's card and page."""
+    from . import engine
+
+    c = engine.counts()
+    return {
+        "pending": c.get("pending", 0),
+        "metrics": [
+            {"label": "notes read", "value": c.get("notes_tracked", 0)},
+            {"label": "entities", "value": c.get("entities", 0)},
+            {"label": "journals mined", "value": c.get("mined", 0)},
+            {"label": "applied", "value": c.get("applied", 0)},
+        ],
+    }
+
+
+def _detail() -> dict:
+    """Extra panels for the Curator's page: what's waiting, what it wants to ask, who it knows."""
+    from . import engine, entities as ents, store
+
+    c = store.conn()
+    try:
+        questions = ents.open_questions(c)
+        registry = [dict(r) for r in c.execute(
+            "SELECT id, name, type, mentions, status, note_path FROM entities "
+            "ORDER BY mentions DESC, id DESC LIMIT 40")]
+    finally:
+        c.close()
+    return {"proposals": engine.proposals(), "questions": questions,
+            "entities": registry, "hub_threshold": ents._MENTION_THRESHOLD}
 
 
 # -- plugin API (mounted at /plugins/curator) ------------------------------
@@ -138,6 +199,6 @@ def _render_widget() -> str:
     q = (f'<li class="ws"><span class="ws-name">{questions} open question'
          f'{"s" if questions != 1 else ""} for you</span>'
          f'<span class="ws-facts">gap-finding</span></li>' if questions else "")
-    review = ('<button class="btn link-more" hx-get="/ui/agents/curate_vault" '
-              'hx-target="#view" hx-swap="innerHTML">review fixes →</button>' if pending else "")
+    review = ('<a class="btn link-more" href="/agents/curator">review fixes →</a>'
+              if pending else "")
     return f'<ul class="ws-list">{summary}{q}{rows}</ul>{review}'

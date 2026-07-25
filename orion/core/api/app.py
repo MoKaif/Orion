@@ -11,14 +11,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.requests import Request
 
 from orion import __version__
-from orion.core import identity, orchestrator, plugins
+from orion.core import agents, identity, orchestrator, plugins
+from orion.core.config import config
 from orion.core.constitution import constitution
 from orion.core.scheduler import scheduler
 from orion.core.world_model import world_model
@@ -138,7 +139,7 @@ async def plugins_list():
     """Discovered plugins + what each manifest contributes (mission-control introspection)."""
     return [
         {"name": p.name, "version": p.version, "tools": p.tools,
-         "specialists": p.specialists, "entity_types": p.entity_types,
+         "specialists": p.specialists, "agents": p.agents, "entity_types": p.entity_types,
          "relationship_types": p.relationship_types,
          "background_jobs": [j.get("name") for j in p.background_jobs],
          "dashboard_widgets": p.dashboard_widgets, "permissions": p.permissions}
@@ -188,27 +189,35 @@ async def ingest_vault():
 
 @app.get("/jobs")
 async def jobs():
-    return [{"name": j.name, "cron": j.cron, "last_run": j.last_run,
+    return [{"name": j.name, "agent": j.agent, "cron": j.cron, "last_run": j.last_run,
              "next_run": j.next_run, "running_since": j.running_since,
+             "queued_since": j.queued_since, "enabled": scheduler.enabled(j.name),
              "preemptible": j.foreground_preemptible} for j in scheduler.jobs()]
 
 
 @app.post("/jobs/{name}/run")
 async def run_job(name: str):
+    """Run a job and wait for the result (scripting path; the UI uses the queued route)."""
     return await scheduler.run_now(name)
 
 
 # -- JSON API for the React SPA -------------------------------------------
 # The SPA consumes these; the /ui/* Jinja fragments below stay until the SPA is at parity.
-def _job_dict(job, label: str | None = None) -> dict:
+def _job_dict(job, runs: int = 0) -> dict:
+    """One job as the UI sees it: what it does, when it runs, how the last run went."""
     hist = scheduler.history(job.name)
     last = hist[0] if hist else None
     return {
-        "name": job.name, "label": label or job.name.replace("_", " "),
-        "cron": job.cron, "next_run": job.next_run, "last_run": job.last_run,
-        "running_since": job.running_since,
+        "name": job.name, "label": job.display_label, "description": job.description,
+        "agent": job.agent, "cron": job.cron, "enabled": scheduler.enabled(job.name),
+        "limit": job.limit, "limit_default": job.limit_default,
+        "next_run": job.next_run, "last_run": job.last_run,
+        "running_since": job.running_since, "queued_since": job.queued_since,
         "last_ok": (last.get("ok") if last else None),
         "last_result": (last.get("result") if last else None),
+        "last_seconds": (last.get("seconds") if last else None),
+        "run_count": len(hist),
+        "runs": hist[:runs] if runs else [],
     }
 
 
@@ -226,31 +235,115 @@ async def api_inbox():
 
 @app.get("/api/agents")
 async def api_agents():
-    """Background jobs, with every vault/Obsidian pass grouped under the Curator umbrella."""
-    jobs_ = scheduler.jobs()
-    by_name = {j.name: j for j in jobs_}
-    return {
-        "curator": {
-            "pending": len(_curator_proposals() or []),
-            "jobs": [_job_dict(by_name[n], _VAULT_JOBS[n]) for n in _VAULT_JOBS if n in by_name],
-        },
-        "other": [_job_dict(j) for j in jobs_ if j.name not in _VAULT_JOBS],
-    }
+    """One card per registered agent: who it is, how its passes are doing, what's waiting.
+
+    Core knows nothing about any particular agent — Curator and Conductor arrive through the
+    same registration a third agent will use.
+    """
+    return [_agent_card(a) for a in agents.all_agents()]
 
 
 @app.get("/api/agents/{name}")
 async def api_agent_detail(name: str):
-    """One agent: status, run log, and (for the Curator) its pending proposals + questions."""
-    job = _job(name)
-    if job is None:
-        return {"error": "unknown agent"}
-    is_curator_pass = name in _VAULT_JOBS
+    """One agent's page: its passes with their controls, its own panels, and the run log."""
+    agent = agents.get(name)
+    if agent is None:
+        return JSONResponse({"error": f"unknown agent '{name}'"}, status_code=404)
+    # the agent's own panels go alongside the core keys, never over them
+    panels = {k: v for k, v in agents.detail_of(agent).items()
+              if k not in ("agent", "summary", "jobs")}
     return {
-        "job": _job_dict(job, _VAULT_JOBS.get(name)),
-        "runs": scheduler.history(name),
-        "proposals": (_curator_proposals() or []) if is_curator_pass else [],
-        "questions": _curator_questions() if is_curator_pass else [],
-        "entities": _curator_entities() if name == "build_registry" else [],
+        **panels,
+        "agent": agent.card(),
+        "summary": agents.summary_of(agent),
+        "jobs": [_job_dict(j, runs=8) for j in _agent_jobs(name)],
+    }
+
+
+@app.post("/api/agents/{name}/jobs/{job_name}/run")
+async def api_run_job(name: str, job_name: str):
+    """Queue one of this agent's passes. Returns at once; the page polls for progress."""
+    job = _job(job_name)
+    if job is None or job.agent != name:
+        return JSONResponse({"error": f"'{job_name}' is not one of {name}'s passes"},
+                            status_code=404)
+    return scheduler.request_run(job_name)
+
+
+class JobPatch(BaseModel):
+    enabled: bool | None = None
+    cron: str | None = None
+    limit: int | None = None
+
+
+@app.patch("/api/agents/{name}/jobs/{job_name}")
+async def api_patch_job(name: str, job_name: str, body: JobPatch):
+    """Retune one pass: pause it, change its schedule, or change how much it does per run.
+
+    Writes the gitignored config/jobs.local.json overlay (never the tracked defaults) and
+    reschedules immediately, so a change takes effect without a restart.
+    """
+    job = _job(job_name)
+    if job is None or job.agent != name:
+        return JSONResponse({"error": f"'{job_name}' is not one of {name}'s passes"},
+                            status_code=404)
+
+    patch: dict = {}
+    if body.enabled is not None:
+        patch["enabled"] = body.enabled
+    if body.cron is not None:
+        cron = body.cron.strip()
+        if not _valid_cron(cron):
+            return JSONResponse(
+                {"error": f"{cron!r} isn't a schedule Orion can read. Use five cron fields, "
+                          "like '0 3 * * *' for 03:00 daily."}, status_code=400)
+        patch["cron"] = cron
+    if body.limit is not None:
+        if job.limit_default is None:
+            return JSONResponse({"error": f"'{job_name}' doesn't work in batches"},
+                                status_code=400)
+        patch["limit"] = max(1, min(500, body.limit))
+
+    if patch:
+        config.update_local("jobs", {"jobs": {job_name: patch}})
+        scheduler.apply_config()
+    return _job_dict(_job(job_name), runs=8)
+
+
+def _valid_cron(expr: str) -> bool:
+    """True if croniter can read this schedule; falls back to a field count when it's absent."""
+    try:
+        from croniter import croniter
+        return croniter.is_valid(expr)
+    except ImportError:
+        return len(expr.split()) == 5
+
+
+def _agent_jobs(name: str) -> list:
+    """This agent's jobs, in registration order, including any that named it as a fallback."""
+    return [j for j in scheduler.jobs() if agents.resolve(j.agent).name == name]
+
+
+def _agent_card(agent) -> dict:
+    """An agent's card: identity + rolled-up state of its passes + its own headline numbers."""
+    jobs_ = _agent_jobs(agent.name)
+    nexts = sorted(j.next_run for j in jobs_ if j.next_run)
+    lasts = sorted((j.last_run for j in jobs_ if j.last_run), reverse=True)
+    failed = [j.name for j in jobs_
+              if (scheduler.history(j.name) or [{}])[0].get("ok") is False]
+    return {
+        **agent.card(),
+        "summary": agents.summary_of(agent),
+        "job_count": len(jobs_),
+        "paused": sum(1 for j in jobs_ if not scheduler.enabled(j.name)),
+        "busy": any(j.running_since or j.queued_since for j in jobs_),
+        "failing": failed,
+        "next_run": nexts[0] if nexts else None,
+        "last_run": lasts[0] if lasts else None,
+        # the shift strip on the card is drawn from these — schedule as information
+        "jobs": [{"name": j.name, "label": j.display_label, "cron": j.cron,
+                  "enabled": scheduler.enabled(j.name), "next_run": j.next_run}
+                 for j in jobs_],
     }
 
 
@@ -349,18 +442,6 @@ async def ui_chat(request: Request, session_id: int | None = None):
 
 
 # -- inbox: unified review queue (world-model inferences + Curator note edits) --
-# The vault/Obsidian jobs, all owned by Curator. Order = display order under the umbrella;
-# value = the friendly sub-agent label shown in the Agents view.
-_VAULT_JOBS = {
-    "curate_vault":    "Grammar & spelling",
-    "build_registry":  "Entity registry",
-    "grow_memory":     "Journal → memory",
-    "weave_graph":     "Backlinks",
-    "index_vault":     "Vault search index",
-    "curator_backfill": "Backfill (all passes)",
-}
-
-
 def _obsidian_uri(rel: str) -> str:
     """Deep link into the Obsidian app for a vault-relative note path (empty if unavailable)."""
     try:
@@ -432,66 +513,36 @@ def _curator_proposals() -> list | None:
         return None
 
 
-def _curator_questions() -> list:
-    """Open Curator gap-questions, or [] if the plugin isn't loaded."""
-    try:
-        from plugins.curator import entities, store
-        c = store.conn()
-        out = entities.open_questions(c)
-        c.close()
-        return out
-    except Exception:
-        return []
-
-
-def _curator_entities(limit: int = 40) -> list:
-    """The Curator's resident entity registry (most-mentioned first), or [] if unavailable."""
-    try:
-        from plugins.curator import store
-        c = store.conn()
-        rows = [dict(r) for r in c.execute(
-            "SELECT id, name, type, mentions, status, note_path FROM entities "
-            "ORDER BY mentions DESC, id DESC LIMIT ?", (limit,))]
-        c.close()
-        return rows
-    except Exception:
-        return []
+def _agent_or_owner(name: str):
+    """An agent by name, or — for an old /ui/agents/<job> link — the agent that owns that job."""
+    agent = agents.get(name)
+    if agent is not None:
+        return agent
+    job = _job(name)
+    return agents.resolve(job.agent) if job is not None else None
 
 
 @app.get("/ui/agents", response_class=HTMLResponse)
 async def ui_agents(request: Request):
-    jobs_ = scheduler.jobs()
-    by_name = {j.name: j for j in jobs_}
-    # Curator owns every Obsidian/vault pass; the rest stand on their own.
-    curator_jobs = [{"job": by_name[n], "label": _VAULT_JOBS[n]}
-                    for n in _VAULT_JOBS if n in by_name]
-    other_jobs = [j for j in jobs_ if j.name not in _VAULT_JOBS]
-    proposals = _curator_proposals() or []
     return _fragment("fragments/agents.html", request,
-                     curator_jobs=curator_jobs, other_jobs=other_jobs,
-                     runs={j.name: scheduler.history(j.name) for j in jobs_},
-                     pending={"curator": len(proposals)})
+                     cards=[_agent_card(a) for a in agents.all_agents()])
 
 
 @app.get("/ui/agents/{name}", response_class=HTMLResponse)
 async def ui_agent_detail(name: str, request: Request):
-    job = _job(name)
-    if job is None:
-        return HTMLResponse("<p class='empty'>Unknown agent.</p>", status_code=404)
-    proposals = _curator_proposals() if name == "curate_vault" else None
-    questions = _curator_questions() if name == "curate_vault" else []
-    return _fragment("fragments/agent_detail.html", request, job=job,
-                     runs=scheduler.history(name), proposals=proposals, questions=questions)
+    agent = _agent_or_owner(name)
+    if agent is None:
+        return HTMLResponse("<p class='empty'>No agent by that name.</p>", status_code=404)
+    return _fragment("fragments/agent_detail.html", request,
+                     agent=agent.card(), summary=agents.summary_of(agent),
+                     jobs=[_job_dict(j, runs=6) for j in _agent_jobs(agent.name)],
+                     panels=agents.detail_of(agent))
 
 
 @app.post("/ui/agents/{name}/run", response_class=HTMLResponse)
 async def ui_agent_run(name: str, request: Request):
-    """Fire a job without blocking the UI; the detail view polls while it runs."""
-    import asyncio
-    job = _job(name)
-    if job is not None and not job.running_since:
-        asyncio.create_task(scheduler.run_now(name))
-        await asyncio.sleep(0.2)   # let running_since set so the re-render shows it
+    """Queue a pass by job name and re-render its agent's page, which polls while it runs."""
+    scheduler.request_run(name)
     return await ui_agent_detail(name, request)
 
 

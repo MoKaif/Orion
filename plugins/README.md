@@ -53,20 +53,33 @@ A plugin ships two things:
        orion.add_specialist(MySpecialist())                      # domain expert for delegation
        orion.add_entity_type("workout", "A logged exercise session.")   # extends the world model
        orion.add_relationship_type("performed", "User did this workout.")
-       orion.add_job("sync_fitbit", "0 * * * *", _sync)          # idle-by-default background job
+       orion.add_agent("trainer", "Trainer", tagline="Health", summary=_summary)  # a card on /agents
+       orion.add_job("sync_fitbit", "0 * * * *", _sync, agent="trainer",
+                     label="Fitbit sync", description="Pull yesterday's activity.",
+                     limit_default=10)                           # idle-by-default background job
        orion.add_widget("today_rings", "Today", _render_rings)   # mission-control card (returns HTML)
    ```
 
-### The six extension points (Manifesto §9)
+### The extension points (Manifesto §9)
 
 | Contribution | How | Where it shows up |
 |---|---|---|
 | **Tools** | `orion.add_tool(tool)` | RAG tool selection, `/tools`, confirm gate |
 | **Specialists** | `orion.add_specialist(s)` | orchestrator delegation, `/specialists` |
+| **Agents** | `orion.add_agent(name, title, …)` | a card on `/agents` + its own page, `/api/agents` |
 | **Entity / relationship types** | `orion.add_entity_type(...)` / `add_relationship_type(...)`, or just declare them in the manifest | `/types`, graph legend, extract guidance |
-| **Background jobs** | `orion.add_job(name, cron, coro)` | scheduler, `/jobs`, retunable in `config/jobs.json` |
+| **Background jobs** | `orion.add_job(name, cron, coro, agent=…)` | its agent's page, `/jobs`, retunable per job |
 | **Dashboard widgets** | `orion.add_widget(name, title, render)` | mission-control dashboard |
 | **API routes** | export a module-level `router` (a FastAPI `APIRouter`) | mounted at `/plugins/<name>/…` |
+
+**Agents own jobs.** A job with no `agent=` belongs to the core **Conductor**; naming another
+plugin's agent (`agent="curator"`) is safe — if that plugin is disabled the job falls back to the
+Conductor rather than vanishing. An agent may pass two callbacks: `summary()` for the headline
+numbers on its card (`{"pending": int, "metrics": [{"label", "value"}]}`) and `detail()` for
+extra panels on its page (`proposals` / `questions` / `entities` are rendered when present).
+Both are called defensively — one that raises never breaks the view. Set `limit_default` on a
+batched job to give the user a "per run" dial, and read it at run time with
+`orion.job_limit(name, default)`.
 
 Types stay free-text in SQLite (no migrations) — registering a type **documents** it; the store
 still accepts any type, honouring "evolution over completion."

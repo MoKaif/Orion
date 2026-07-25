@@ -25,27 +25,64 @@ export interface InboxItem {
   diff?: string;
 }
 
-export interface Job {
-  name: string;
-  label: string;
-  cron: string;
-  next_run: string | null;
-  last_run: string | null;
-  running_since: string | null;
-  last_ok: boolean | null;
-  last_result: string | null;
-}
-
-export interface AgentsData {
-  curator: { pending: number; jobs: Job[] };
-  other: Job[];
-}
-
 export interface RunLog {
   ok: boolean;
   result: string;
   at: string;
   seconds: number;
+}
+
+/** One pass an agent runs: what it does, when, and how the last run went. */
+export interface Job {
+  name: string;
+  label: string;
+  description: string;
+  agent: string;
+  cron: string;
+  enabled: boolean;
+  limit: number | null;
+  limit_default: number | null;
+  next_run: string | null;
+  last_run: string | null;
+  running_since: string | null;
+  queued_since: string | null;
+  last_ok: boolean | null;
+  last_result: string | null;
+  last_seconds: number | null;
+  run_count: number;
+  runs: RunLog[];
+}
+
+export interface Metric {
+  label: string;
+  value: string | number;
+}
+
+export interface AgentSummary {
+  pending?: number;
+  metrics?: Metric[];
+}
+
+export interface AgentIdentity {
+  name: string;
+  title: string;
+  tagline: string;
+  blurb: string;
+  icon: string;
+  accent: "copper" | "fact" | "observation" | "idea";
+  plugin: string;
+}
+
+/** An agent's card on the Agents view: identity plus the rolled-up state of its passes. */
+export interface AgentCard extends AgentIdentity {
+  summary: AgentSummary;
+  job_count: number;
+  paused: number;
+  busy: boolean;
+  failing: string[];
+  next_run: string | null;
+  last_run: string | null;
+  jobs: { name: string; label: string; cron: string; enabled: boolean; next_run: string | null }[];
 }
 
 export interface Proposal {
@@ -72,12 +109,21 @@ export interface RegistryEntity {
   note_path: string | null;
 }
 
+/** An agent's own page. The optional panels are contributed by the agent itself. */
 export interface AgentDetail {
-  job: Job;
-  runs: RunLog[];
-  proposals: Proposal[];
-  questions: Question[];
-  entities: RegistryEntity[];
+  agent: AgentIdentity;
+  summary: AgentSummary;
+  jobs: Job[];
+  proposals?: Proposal[];
+  questions?: Question[];
+  entities?: RegistryEntity[];
+  hub_threshold?: number;
+}
+
+export interface JobPatch {
+  enabled?: boolean;
+  cron?: string;
+  limit?: number;
 }
 
 export interface Vitals {
@@ -122,6 +168,21 @@ async function postForm(url: string, body: Record<string, string>): Promise<void
   if (!r.ok) throw new Error(`${url} -> ${r.status}`);
 }
 
+/** Send JSON and surface the server's own message on failure — it's written for the user. */
+async function sendJSON<T>(url: string, method: "POST" | "PATCH", body?: unknown): Promise<T> {
+  const r = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok || (data && typeof data === "object" && "error" in data)) {
+    const msg = data && typeof data === "object" && "error" in data ? String(data.error) : null;
+    throw new Error(msg || `${url} -> ${r.status}`);
+  }
+  return data as T;
+}
+
 // ---- queries -----------------------------------------------------------
 export const useInbox = () =>
   useQuery({ queryKey: ["inbox"], queryFn: () => getJSON<InboxItem[]>("/api/inbox") });
@@ -129,15 +190,18 @@ export const useInbox = () =>
 export const useAgents = () =>
   useQuery({
     queryKey: ["agents"],
-    queryFn: () => getJSON<AgentsData>("/api/agents"),
+    queryFn: () => getJSON<AgentCard[]>("/api/agents"),
     refetchInterval: 8000,
   });
+
+const busy = (jobs?: Job[]) => !!jobs?.some((j) => j.running_since || j.queued_since);
 
 export const useAgentDetail = (name: string) =>
   useQuery({
     queryKey: ["agent", name],
     queryFn: () => getJSON<AgentDetail>(`/api/agents/${name}`),
-    refetchInterval: (q) => (q.state.data?.job.running_since ? 5000 : false),
+    // poll only while something is actually working
+    refetchInterval: (q) => (busy(q.state.data?.jobs) ? 3000 : false),
   });
 
 export const useVitals = () =>
@@ -175,13 +239,28 @@ export function useResolveInbox() {
   });
 }
 
-export function useRunAgent() {
+/** Queue one of an agent's passes. Returns immediately; the page polls for progress. */
+export function useRunJob(agent: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => postForm(`/jobs/${name}/run`, {}),
-    onSuccess: (_d, name) => {
+    mutationFn: (job: string) =>
+      sendJSON<{ queued: boolean }>(`/api/agents/${agent}/jobs/${job}/run`, "POST"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent", agent] });
       qc.invalidateQueries({ queryKey: ["agents"] });
-      qc.invalidateQueries({ queryKey: ["agent", name] });
+    },
+  });
+}
+
+/** Retune one pass — pause it, reschedule it, or change how much it does per run. */
+export function useUpdateJob(agent: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ job, patch }: { job: string; patch: JobPatch }) =>
+      sendJSON<Job>(`/api/agents/${agent}/jobs/${job}`, "PATCH", patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent", agent] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
     },
   });
 }

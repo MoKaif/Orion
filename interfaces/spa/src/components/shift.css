@@ -1,0 +1,82 @@
+/* The 24-hour shift strip: an agent's working day, drawn from its cron. */
+.shift {
+  margin-top: auto;
+  padding-top: 14px;
+}
+.shift-track {
+  position: relative;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-bottom-width: 0;
+  overflow: hidden;
+}
+/* quarter-day gridlines: the only ornament here, and it carries the scale */
+.shift-hour {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+.shift-hour:first-of-type {
+  background: none;
+}
+
+.shift-mark {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--accent, var(--copper));
+  box-shadow: 0 0 8px -1px color-mix(in srgb, var(--accent, var(--copper)) 60%, transparent);
+}
+/* runs on some days only — hollow, because most days it's quiet */
+.shift-mark.weekly {
+  background: color-mix(in srgb, var(--accent, var(--copper)) 26%, transparent);
+  border: 1px solid var(--accent, var(--copper));
+  box-shadow: none;
+}
+/* runs right through the day */
+.shift-mark.band {
+  left: 0;
+  right: 0;
+  width: auto;
+  margin: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent, var(--copper)) 38%, transparent) 0 2px,
+    transparent 2px 14px
+  );
+  box-shadow: none;
+}
+.shift-mark.off {
+  background: var(--line-2);
+  border-color: var(--line-2);
+  box-shadow: none;
+}
+.shift-mark.band.off {
+  background: repeating-linear-gradient(90deg, var(--line-2) 0 2px, transparent 2px 14px);
+}
+
+.shift-scale {
+  position: relative;
+  height: 13px;
+  font: 500 8.5px/13px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--faint);
+}
+.shift-scale span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-1px);
+}
+.shift-scale .shift-end {
+  left: auto;
+  right: 0;
+  transform: none;
+}

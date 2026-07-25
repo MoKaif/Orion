@@ -1,28 +1,95 @@
+import { CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Play, ChevronRight, Loader2, CircleAlert } from "lucide-react";
-import { Job, useAgents, useRunAgent } from "../api";
+import {
+  BookOpen,
+  Bot,
+  Compass,
+  ArrowRight,
+  Loader2,
+  CircleAlert,
+  PauseCircle,
+  LucideIcon,
+} from "lucide-react";
+import { AgentCard, useAgents } from "../api";
 import { Loading } from "../components/bits";
+import { ShiftStrip } from "../components/shift";
+import { agoText, untilText } from "../cron";
 import "./agents.css";
 
-function RunButton({ job }: { job: Job }) {
-  const run = useRunAgent();
-  const busy = !!job.running_since || run.isPending;
-  return (
-    <button
-      className="btn btn-primary btn-sm"
-      disabled={busy}
-      onClick={() => run.mutate(job.name)}
-    >
-      {busy ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
-      {job.running_since ? "Running…" : "Run now"}
-    </button>
-  );
+/** Agents name their icon when they register; core stays out of the picture. */
+const ICONS: Record<string, LucideIcon> = {
+  "book-open": BookOpen,
+  compass: Compass,
+  bot: Bot,
+};
+
+/** One state line per agent, in priority order — never two competing signals at once. */
+function statusOf(a: AgentCard) {
+  if (a.failing.length)
+    return { tone: "failed", icon: CircleAlert, text: "last run failed" } as const;
+  if (a.busy) return { tone: "busy", icon: Loader2, text: "working" } as const;
+  const pending = a.summary.pending ?? 0;
+  if (pending)
+    return { tone: "waiting", icon: CircleAlert, text: `${pending} waiting for you` } as const;
+  if (a.job_count > 0 && a.paused === a.job_count)
+    return { tone: "paused", icon: PauseCircle, text: "all passes paused" } as const;
+  return { tone: "idle", icon: null, text: "idle" } as const;
 }
 
-function StatusBadge({ job }: { job: Job }) {
-  if (job.running_since) return <span className="run-badge running">running</span>;
-  if (job.last_ok === false) return <span className="run-badge failed">failed</span>;
-  return null;
+function Card({ agent }: { agent: AgentCard }) {
+  const Icon = ICONS[agent.icon] ?? Bot;
+  const status = statusOf(agent);
+  const StatusIcon = status.icon;
+  const metrics = agent.summary.metrics ?? [];
+
+  return (
+    <Link
+      to={`/agents/${agent.name}`}
+      className="agent-card"
+      style={{ "--accent": `var(--${agent.accent})` } as CSSProperties}
+    >
+      <header className="ac-head">
+        <span className="ac-mark">
+          <Icon size={18} strokeWidth={1.9} />
+        </span>
+        <div className="ac-name">
+          <p className="ac-tagline">{agent.tagline || agent.plugin}</p>
+          <h2>{agent.title}</h2>
+        </div>
+        <span className={`ac-status st-${status.tone}`}>
+          {StatusIcon && <StatusIcon size={12} className={status.tone === "busy" ? "spin" : ""} />}
+          {status.text}
+        </span>
+      </header>
+
+      <p className="ac-blurb">{agent.blurb}</p>
+
+      {metrics.length > 0 && (
+        <dl className="ac-metrics">
+          {metrics.map((m) => (
+            <div key={m.label}>
+              <dt>{m.label}</dt>
+              <dd>{m.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <ShiftStrip jobs={agent.jobs} />
+
+      <footer className="ac-foot">
+        <span className="ac-count">
+          {agent.job_count} {agent.job_count === 1 ? "pass" : "passes"}
+          {agent.paused > 0 && <em> · {agent.paused} paused</em>}
+        </span>
+        <span className="ac-when">
+          {agent.next_run ? `next ${untilText(agent.next_run)}` : "manual only"}
+          {agent.last_run ? ` · ran ${agoText(agent.last_run)}` : ""}
+        </span>
+        <ArrowRight className="ac-go" size={15} />
+      </footer>
+    </Link>
+  );
 }
 
 export default function Agents() {
@@ -33,94 +100,26 @@ export default function Agents() {
     <>
       <header className="view-head">
         <div>
-          <p className="eyebrow">Background life</p>
+          <p className="eyebrow">Night shift</p>
           <h1 className="view-title">Agents</h1>
         </div>
         <p className="view-note">
-          Orion's own work while you're away. Each runs on its schedule — or right now, if you say
-          so.
+          The work Orion does while you're away. Open one to run a pass by hand or change when it
+          works.
         </p>
       </header>
 
-      {data.curator.jobs.length > 0 && (
-        <section className="card curator-agent">
-          <header className="curator-head">
-            <span className="curator-mark">
-              <BookOpen size={19} />
-            </span>
-            <div className="curator-title">
-              <p className="eyebrow">Obsidian vault</p>
-              <h2>Curator</h2>
-            </div>
-            {data.curator.pending > 0 && (
-              <Link to="/inbox" className="curator-pending">
-                <CircleAlert size={14} />
-                {data.curator.pending} to review
-                <ChevronRight size={14} />
-              </Link>
-            )}
-          </header>
-          <p className="curator-blurb">
-            The vault's resident editor and memory-builder. Every pass below proposes — nothing
-            touches a note or your world model until you approve it in the inbox.
-          </p>
-
-          <ul className="subagents">
-            {data.curator.jobs.map((j) => (
-              <li className="subagent" key={j.name}>
-                <div className="subagent-main">
-                  <span className="subagent-name">{j.label}</span>
-                  <StatusBadge job={j} />
-                  <span className="subagent-cron">
-                    {j.cron} · next {j.next_run || "manual"}
-                  </span>
-                </div>
-                <div className="subagent-actions">
-                  <Link to={`/agents/${j.name}`} className="btn btn-sm">
-                    Details
-                  </Link>
-                  <RunButton job={j} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {data.other.length > 0 && (
-        <>
-          <h3 className="section-label">Other agents</h3>
-          <div className="grid">
-            {data.other.map((j) => (
-              <section className="card agent-card" key={j.name}>
-                <header className="card-head">
-                  <h2>{j.label}</h2>
-                  <StatusBadge job={j} />
-                </header>
-                <dl className="agent-meta">
-                  <div>
-                    <dt>schedule</dt>
-                    <dd>{j.cron}</dd>
-                  </div>
-                  <div>
-                    <dt>next run</dt>
-                    <dd>{j.next_run || "manual only"}</dd>
-                  </div>
-                  <div>
-                    <dt>last run</dt>
-                    <dd>{j.last_run || "never"}</dd>
-                  </div>
-                </dl>
-                <footer className="agent-actions">
-                  <Link to={`/agents/${j.name}`} className="btn btn-sm">
-                    Details
-                  </Link>
-                  <RunButton job={j} />
-                </footer>
-              </section>
-            ))}
-          </div>
-        </>
+      {data.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-glyph">◷</span>
+          No agents are registered yet. A plugin adds one by calling <code>add_agent</code>.
+        </div>
+      ) : (
+        <div className="agent-grid">
+          {data.map((a) => (
+            <Card key={a.name} agent={a} />
+          ))}
+        </div>
       )}
     </>
   );

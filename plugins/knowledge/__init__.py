@@ -18,13 +18,22 @@ def register() -> None:
     orion.add_relationship_type("originated_from", "Knowledge derived from a note.",
                                 plugin="knowledge")
 
-    # Hourly vault indexing (idle-by-default, preempted by interactive chat).
+    # Hourly vault indexing (idle-by-default, preempted by interactive chat). Filed under the
+    # Curator's card — it's vault work, and that's where the user looks for it. If the curator
+    # plugin is ever disabled the job falls back to the Conductor rather than disappearing.
     from .ingest import ingest_vault
 
     async def _index_vault():
-        return ingest_vault()
+        # ingest_vault is synchronous and walks the whole vault (file reads + embedding), which
+        # would pin the event loop and freeze every request for the length of the run. Hand it
+        # to a worker thread so the UI stays answerable while it works.
+        import asyncio
+        return await asyncio.to_thread(ingest_vault)
 
-    orion.add_job("index_vault", "0 * * * *", _index_vault)
+    orion.add_job("index_vault", "0 * * * *", _index_vault, agent="curator",
+                  label="Vault search index",
+                  description="Re-reads every note so search and recall can find it. Updates "
+                              "notes in place rather than duplicating them.")
 
     # Mission-control widget declared in the manifest: this plugin's slice of the world model
     # (its own entity types), distinct from the core dashboard cards.

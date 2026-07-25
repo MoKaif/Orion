@@ -1,51 +1,75 @@
-{# One agent's page: live status, pending work (Curator proposals), and the run log.
-   While the job runs, the view refreshes itself every 6s so progress is visible. #}
+{# One agent's page: its passes with their controls, the panels it contributes, and the run log.
+   While a pass is working the view refreshes itself every 6s so progress is visible.
+   Schedule/batch-size editing lives in the SPA; this legacy view runs and pauses. #}
 {% macro diff_block(diff) -%}
 <pre class="diffview">{% for line in diff.split('\n') -%}
 <span class="dl {{ 'dl-hunk' if line.startswith('@@') else 'dl-meta' if line.startswith('+++') or line.startswith('---') else 'dl-add' if line.startswith('+') else 'dl-del' if line.startswith('-') else '' }}">{{ line }}</span>
 {% endfor %}</pre>
 {%- endmacro %}
 
-<div {% if job.running_since %}hx-get="/ui/agents/{{ job.name }}" hx-trigger="every 6s"
+{% set busy = jobs | selectattr('running_since') | list or jobs | selectattr('queued_since') | list %}
+<div style="--accent: var(--{{ agent.accent }})"
+     {% if busy %}hx-get="/ui/agents/{{ agent.name }}" hx-trigger="every 6s"
      hx-target="#view" hx-swap="innerHTML"{% endif %}>
 
 <section class="view-head">
   <div>
-    <p class="eyebrow">Agent</p>
-    <h1 class="view-title">{{ job.name.replace('_', ' ') }}</h1>
+    <p class="eyebrow">{{ agent.tagline or agent.plugin }}</p>
+    <h1 class="view-title">{{ agent.title }}</h1>
   </div>
   <div class="agent-actions">
     <button class="btn" hx-get="/ui/agents" hx-target="#view" hx-swap="innerHTML">← All agents</button>
-    <button class="btn btn-primary" {{ 'disabled' if job.running_since else '' }}
-            hx-post="/ui/agents/{{ job.name }}/run" hx-target="#view" hx-swap="innerHTML">
-      {{ 'Running…' if job.running_since else 'Run now' }}</button>
   </div>
 </section>
 
+<p class="agent-blurb">{{ agent.blurb }}</p>
+
+{% if summary.get('metrics') %}
+<dl class="agent-meta agent-meta-row">
+  {% for m in summary['metrics'] %}
+  <div><dt>{{ m.label }}</dt><dd>{{ m.value }}</dd></div>
+  {% endfor %}
+</dl>
+{% endif %}
+
 <div class="grid">
 
-  <!-- Status -->
+  <!-- Passes -->
   <section class="card span-2">
-    <header class="card-head"><h2>Status</h2>
-      {% if job.running_since %}<span class="run-badge running">running since {{ job.running_since }}</span>
-      {% else %}<span class="run-badge idle">idle</span>{% endif %}
-    </header>
-    <dl class="agent-meta agent-meta-row">
-      <div><dt>schedule</dt><dd>{{ job.cron }}</dd></div>
-      <div><dt>next run</dt><dd>{{ job.next_run or 'manual only' }}</dd></div>
-      <div><dt>last run</dt><dd>{{ job.last_run or 'never' }}</dd></div>
-      <div><dt>last result</dt><dd class="agent-result">{{ job.last_result or '—' }}</dd></div>
-    </dl>
+    <header class="card-head"><h2>Passes</h2><span class="count">{{ jobs|length }}</span></header>
+    <ul class="subagent-list">
+      {% for j in jobs %}
+      <li class="subagent">
+        <div class="subagent-main">
+          <span class="subagent-name">{{ j.label }}</span>
+          {% if j.running_since %}<span class="run-badge running">running</span>
+          {% elif j.queued_since %}<span class="run-badge running">queued</span>
+          {% elif not j.enabled %}<span class="run-badge idle">paused</span>
+          {% elif j.last_ok is false %}<span class="run-badge failed">last run failed</span>{% endif %}
+          <span class="subagent-cron">
+            {{ j.cron }}{% if j.limit %} · {{ j.limit }} per run{% endif %}
+            {%- if j.enabled and j.next_run %} · next {{ j.next_run }}{% endif %}</span>
+          {% if j.description %}<span class="proposal-hint">{{ j.description }}</span>{% endif %}
+        </div>
+        <div class="subagent-actions">
+          <button class="btn btn-sm btn-primary"
+                  {{ 'disabled' if j.running_since or j.queued_since else '' }}
+                  hx-post="/ui/agents/{{ j.name }}/run" hx-target="#view" hx-swap="innerHTML">
+            Run now</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
   </section>
 
-  {% if questions %}
-  <!-- Gap-finding: the model asks when it can't resolve something. One line each. -->
+  {% if panels.get('questions') %}
+  <!-- Gap-finding: the agent asks when it can't resolve something. One line each. -->
   <section class="card span-2">
     <header class="card-head"><h2>Questions for you</h2>
-      <span class="count count-alert">{{ questions|length }}</span>
+      <span class="count count-alert">{{ panels['questions']|length }}</span>
     </header>
     <div class="proposal-list">
-      {% for q in questions %}
+      {% for q in panels['questions'] %}
       <article class="proposal">
         <header class="proposal-head">
           <span class="proposal-path">{{ q.subject }}</span>
@@ -63,16 +87,16 @@
   </section>
   {% endif %}
 
-  {% if proposals is not none %}
-  <!-- Curator's pending proposals: grammar fixes, backlinks, and new entity notes.
+  {% if 'proposals' in panels %}
+  <!-- Pending proposals: grammar fixes, backlinks, and new entity notes.
        The diff is the whole story — approve or reject each. -->
   <section class="card span-2">
-    <header class="card-head"><h2>Proposals awaiting review</h2>
-      <span class="count {{ 'count-alert' if proposals else '' }}">{{ proposals|length }}</span>
+    <header class="card-head"><h2>Waiting for you</h2>
+      <span class="count {{ 'count-alert' if panels['proposals'] else '' }}">{{ panels['proposals']|length }}</span>
     </header>
-    {% if proposals %}
+    {% if panels['proposals'] %}
     <div class="proposal-list">
-      {% for p in proposals %}
+      {% for p in panels['proposals'] %}
       <article class="proposal">
         <header class="proposal-head">
           <span class="kind-badge kind-{{ p.kind or 'grammar' }}">{{ (p.kind or 'grammar').replace('_', ' ') }}</span>
@@ -96,27 +120,31 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="empty">Nothing waiting. Run the agent to scan more notes.</p>
+    <p class="empty">Nothing waiting. Run a pass to read more notes.</p>
     {% endif %}
   </section>
   {% endif %}
 
-  <!-- Run log -->
+  <!-- Run log, merged across this agent's passes -->
   <section class="card span-2">
-    <header class="card-head"><h2>Run log</h2><span class="count">{{ runs|length }}</span></header>
-    {% if runs %}
+    <header class="card-head"><h2>Recent runs</h2></header>
+    {% set activity = [] %}
+    {% for j in jobs %}{% for r in j.runs %}
+      {% set _ = activity.append({'job': j.label, 'ok': r.ok, 'result': r.result, 'at': r.at, 'seconds': r.seconds}) %}
+    {% endfor %}{% endfor %}
+    {% if activity %}
     <ol class="feed">
-      {% for r in runs %}
+      {% for r in activity | sort(attribute='at', reverse=true) %}
       <li class="feed-item">
         <span class="feed-type {{ '' if r.ok else 'feed-type-failed' }}">{{ 'ok' if r.ok else 'failed' }}</span>
-        <span class="feed-detail">{{ r.result }}</span>
+        <span class="feed-detail"><b>{{ r.job }}</b> {{ r.result }}</span>
         <i class="leader" aria-hidden="true"></i>
         <time class="feed-time">{{ r.at }} · {{ r.seconds }}s</time>
       </li>
       {% endfor %}
     </ol>
     {% else %}
-    <p class="empty">No runs recorded yet.</p>
+    <p class="empty">Nothing has run yet.</p>
     {% endif %}
   </section>
 

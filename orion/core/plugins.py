@@ -25,6 +25,7 @@ class PluginManifest:
     name: str
     version: str = "0.0.0"
     specialists: list[str] = field(default_factory=list)
+    agents: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     entity_types: list[str] = field(default_factory=list)
     relationship_types: list[str] = field(default_factory=list)
@@ -93,9 +94,14 @@ def load_all(app: object | None = None) -> list[str]:
 
 
 def _check_manifest(manifest: PluginManifest) -> None:
-    """Warn when a manifest declares tools/specialists that never actually registered."""
-    from orion.core import specialists
+    """Warn when a manifest declares tools/specialists/agents that never actually registered."""
+    from orion.core import agents, specialists
     from orion.core.tools import registry as tools
+
+    for name in manifest.agents:
+        if agents.get(name) is None:
+            log.warning("plugin '%s' declares agent '%s' but it did not register",
+                        manifest.name, name)
 
     have_tools = {t.name for t in tools.all_tools()}
     for name in manifest.tools:
