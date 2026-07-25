@@ -1,0 +1,25 @@
+{% import "fragments/_macros.html" as m %}
+{# Review inbox — the knowledge-lifecycle gate. Nothing inferred becomes truth here
+   until you Accept or Reject. Posting an action swaps this whole list back in. #}
+<section class="view-head">
+  <div>
+    <p class="eyebrow">Knowledge lifecycle</p>
+    <h1 class="view-title">The inbox</h1>
+  </div>
+  <p class="view-note">Everything Orion proposes waits here — knowledge it inferred and note edits
+    the Curator drafted. Each card says which agent produced it and from what. Your stamp is what
+    makes it permanent; nothing is committed until you accept it.</p>
+</section>
+
+<div id="review-list">
+  {% if reviews %}
+  <div class="review-grid">
+    {% for r in reviews %}{{ m.review_card(r) }}{% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-glyph">◈</span>
+    <p>Inbox clear. Every inference has been reviewed.</p>
+  </div>
+  {% endif %}
+</div>

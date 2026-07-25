@@ -1,0 +1,10 @@
+{
+  "//": "Background lifecycle. Idle-by-default in spirit: cheap jobs, gated behind foreground.",
+  "enabled": true,
+  "tick_seconds": 60,
+  "jobs": {
+    "index_vault":     { "enabled": true, "cron": "0 * * * *",  "//": "hourly" },
+    "consolidate":     { "enabled": true, "cron": "0 3 * * *",  "//": "nightly 03:00" },
+    "weekly_briefing": { "enabled": true, "cron": "0 8 * * 1",  "//": "Mondays 08:00" }
+  }
+}

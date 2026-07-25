@@ -1,0 +1,26 @@
+{# Chat — a real streaming pane over the full pipeline. JS (initChat) drives SSE:
+   it surfaces the cognitive mode + specialist Orion chose, tool runs, confirm gates,
+   provider fallbacks, and knowledge queued for review. #}
+<section class="chat" id="chat" data-session="{{ session_id }}">
+  <div class="chat-log" id="chat-log">
+    {% if history %}
+      {% for msg in history %}
+      <div class="msg msg-{{ msg.role }}">
+        <div class="bubble">{{ msg.content }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="chat-hello">
+        <p class="eyebrow">Thread {{ session_id or 'new' }}</p>
+        <h1 class="view-title">What are we thinking about?</h1>
+        <p class="view-note">Orion consults your world model before it answers — it won't reply cold.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <form class="composer" id="composer">
+    <textarea id="composer-input" rows="1" placeholder="Message Orion…"
+              autocomplete="off"></textarea>
+    <button type="submit" class="btn btn-send" id="composer-send" aria-label="Send">↑</button>
+  </form>
+</section>

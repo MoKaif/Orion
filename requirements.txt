@@ -1,0 +1,20 @@
+# Orion core — kept deliberately small for an 8GB CPU-only host.
+fastapi
+uvicorn[standard]
+httpx                 # async LLM/HTTP
+jinja2
+python-multipart
+
+# Local semantic layer (M1) — CPU ONNX embeddings + in-process vector KNN
+fastembed             # ~50MB ONNX, bge-small-en-v1.5
+sqlite-vec            # in-process vector search, single file
+
+# Background scheduling (M3)
+croniter
+
+# Cloud orchestrator (M-cloud) — Claude API brain for reasoning/deep-work turns.
+# Lazy-imported in providers/anthropic.py, so its absence degrades to local Ollama.
+anthropic
+
+# Note: SQLite via stdlib sqlite3 (no extra dep).
+# Note: NO chromadb / torch / sentence-transformers — too heavy for this box.

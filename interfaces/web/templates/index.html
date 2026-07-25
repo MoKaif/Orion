@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orion · Archive</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="sheen" aria-hidden="true"></div>
+
+  <div class="app">
+    <!-- The spine: catalog-drawer navigation -->
+    <nav class="rail" aria-label="Primary">
+      <a class="mark" href="/" title="Orion">
+        <span class="mark-glyph">◆</span>
+        <span class="mark-word">Orion</span>
+      </a>
+      <ul class="nav">
+        <li><button class="nav-item is-active" data-view="dashboard"
+              hx-get="/ui/dashboard" hx-target="#view" hx-swap="innerHTML">
+          <span class="ico">▤</span><span class="lbl">Desk</span></button></li>
+        <li><button class="nav-item" data-view="chat"
+              hx-get="/ui/chat" hx-target="#view" hx-swap="innerHTML">
+          <span class="ico">❯</span><span class="lbl">Chat</span></button></li>
+        <li><button class="nav-item" data-view="reviews"
+              hx-get="/ui/reviews" hx-target="#view" hx-swap="innerHTML">
+          <span class="ico">◈</span><span class="lbl">Inbox</span>
+          <span class="badge" id="rail-review-badge" hidden></span></button></li>
+        <li><button class="nav-item" data-view="agents"
+              hx-get="/ui/agents" hx-target="#view" hx-swap="innerHTML">
+          <span class="ico">◇</span><span class="lbl">Agents</span></button></li>
+        <li><button class="nav-item" data-view="sessions"
+              hx-get="/ui/sessions" hx-target="#view" hx-swap="innerHTML">
+          <span class="ico">≡</span><span class="lbl">Threads</span></button></li>
+      </ul>
+      <div class="rail-foot">
+        <button class="ghost" id="palette-open" title="Command palette (Ctrl/⌘ K)">
+          <span class="ico">⌘</span><span class="lbl">Commands</span></button>
+        <button class="ghost" id="theme-toggle" title="Toggle theme">
+          <span class="ico">◐</span><span class="lbl">Theme</span></button>
+      </div>
+    </nav>
+
+    <div class="main">
+      <!-- The ledger line: live vitals -->
+      <header class="telemetry" id="telemetry"
+              hx-get="/ui/vitals" hx-trigger="load, every 15s" hx-swap="innerHTML">
+        <span class="tele-loading">reading vitals…</span>
+      </header>
+
+      <!-- Swapped view surface -->
+      <main id="view" class="view"
+            hx-get="/ui/dashboard" hx-trigger="load" hx-swap="innerHTML"
+            aria-live="polite"></main>
+    </div>
+  </div>
+
+  <!-- Command palette -->
+  <div class="palette-scrim" id="palette" hidden>
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+      <input id="palette-input" type="text" placeholder="Type a command…"
+             autocomplete="off" spellcheck="false" />
+      <ul id="palette-list" class="palette-list"></ul>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="assertive"></div>
+</body>
+</html>

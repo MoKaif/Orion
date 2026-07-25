@@ -1,0 +1,60 @@
+/* Obsidian Archive design tokens — ported from the original Jinja UI so the SPA keeps the
+   same identity: obsidian green-black base, copper accent, serif display, semantic knowledge
+   colors. Dark by default; light "reading room" via [data-theme="light"]. */
+:root {
+  --bg: #0e100e;
+  --bg-2: #121512;
+  --panel: #171b17;
+  --panel-2: #1c211c;
+  --inset: #0b0d0b;
+  --line: #242a24;
+  --line-2: #323a32;
+
+  --fg: #eae7dd;
+  --muted: #9d9b8d;
+  --faint: #6b6a5e;
+
+  --copper: #d0925f;
+  --copper-2: #e0a878;
+  --copper-dim: #3c2d20;
+
+  --fact: #85bb9c;
+  --observation: #8fa9c9;
+  --idea: #d6b360;
+
+  --ok: #85bb9c;
+  --danger: #cf6a5b;
+
+  --radius: 12px;
+  --radius-sm: 7px;
+  --shadow: 0 20px 50px -28px rgba(0, 0, 0, 0.8);
+  --shadow-sm: 0 2px 10px -4px rgba(0, 0, 0, 0.55);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --rail-w: 216px;
+  --tele-w: 250px;
+}
+
+:root[data-theme="light"] {
+  --bg: #efeee8;
+  --bg-2: #e9e8e1;
+  --panel: #f8f7f2;
+  --panel-2: #fdfcf9;
+  --inset: #e5e4dc;
+  --line: #d8d6ca;
+  --line-2: #c4c2b4;
+  --fg: #26281f;
+  --muted: #6d6c5d;
+  --faint: #9c9a8a;
+  --copper: #b06f38;
+  --copper-2: #96591f;
+  --copper-dim: #ecd9c4;
+  --fact: #3f7f5c;
+  --observation: #4d6f99;
+  --idea: #9a7a1f;
+  --ok: #3f7f5c;
+  --danger: #b0442f;
+  --shadow: 0 16px 40px -26px rgba(46, 44, 26, 0.4);
+  --shadow-sm: 0 2px 10px -6px rgba(46, 44, 26, 0.35);
+}

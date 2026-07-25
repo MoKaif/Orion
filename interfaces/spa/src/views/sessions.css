@@ -1,0 +1,39 @@
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  transition: border-color 0.14s;
+}
+.session-row:hover {
+  border-color: var(--copper);
+}
+.session-row svg {
+  color: var(--copper);
+}
+.session-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+.session-meta {
+  margin-left: auto;
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+}
+.session-date {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}

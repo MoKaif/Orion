@@ -1,0 +1,102 @@
+{# Shared render helpers. Knowledge kinds render as inked classification stamps —
+   the archive's one loud gesture — with a fixed semantic color everywhere. #}
+
+{% macro kind_dot(kind) -%}
+<span class="kind kind-{{ kind }}" title="{{ kind }}">{{ {'fact': 'Fact', 'observation': 'Obs', 'idea': 'Idea'}.get(kind, kind[:4]) }}</span>
+{%- endmacro %}
+
+{% macro conf_meter(confidence) -%}
+<span class="confbar" title="confidence {{ (confidence * 100)|round|int }}%"
+      style="--pct: {{ (confidence * 100)|round|int }}%"><i></i></span>
+{%- endmacro %}
+
+{% macro knowledge_chip(k) -%}
+<div class="kchip kind-border-{{ k.kind }}">
+  {{ kind_dot(k.kind) }}
+  <div class="kchip-body">
+    <p class="kchip-val">{{ k.value }}</p>
+    <p class="kchip-meta"><span>{{ k.name }}</span>{{ conf_meter(k.confidence) }}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{# A syntax-highlighted unified diff, shared by the inbox and the agent detail view. #}
+{% macro diff_block(diff) -%}
+<pre class="diffview">{% for line in diff.split('\n') -%}
+<span class="dl {{ 'dl-hunk' if line.startswith('@@') else 'dl-meta' if line.startswith('+++') or line.startswith('---') else 'dl-add' if line.startswith('+') else 'dl-del' if line.startswith('-') else '' }}">{{ line }}</span>
+{% endfor %}</pre>
+{%- endmacro %}
+
+{# Provenance line — the whole point of the inbox rework: every item says which agent
+   produced it and from what source, with a one-tap link back to the note in Obsidian. #}
+{% macro prov_line(r) -%}
+<div class="prov">
+  <span class="agent-chip agent-{{ r.prov_agent|lower }}">{{ r.prov_agent }}</span>
+  <span class="prov-label">from {{ r.prov_label }}</span>
+  {% if r.prov_uri %}<a class="prov-open" href="{{ r.prov_uri }}"
+     title="Open the source note in Obsidian">open ↗</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{# A single inbox item. Items are normalized in app.py (`_inbox_items`) into one shape with an
+   `origin` — world-model inferences (knowledge / duplicate / discovery / relationship) and the
+   Curator's note-edit proposals (grammar / backlink / entity_note) share this queue. Each posts
+   its Accept/Reject to its own `action_url` and swaps the whole list back in. #}
+{% macro review_card(r) -%}
+{% if r.origin == 'curator' %}
+<article class="review kind-border-{{ r.kind }}">
+  <header class="review-head">
+    <span class="kind-badge kind-{{ r.kind }}">{{ r.kind.replace('_', ' ') }}</span>
+    <span class="review-type" style="margin-left:auto">note edit</span>
+  </header>
+  {{ prov_line(r) }}
+  <p class="review-sub">Curator proposes
+    {{ {'grammar': 'a spelling / grammar fix', 'backlink': 'a new [[wikilink]]',
+        'entity_note': 'a new hub note for this entity'}.get(r.kind, 'an edit') }} —
+    nothing changes on disk until you apply it (it backs up first):</p>
+  {{ diff_block(r.diff) }}
+  <footer class="review-actions">
+    <form hx-post="{{ r.action_url }}" hx-target="#review-list" hx-swap="innerHTML">
+      <button name="action" value="apply" class="btn btn-accept">
+        {{ 'Create note' if r.kind == 'entity_note' else 'Apply' }}</button>
+      <button name="action" value="reject" class="btn btn-reject">Reject</button>
+    </form>
+  </footer>
+</article>
+{% else %}
+<article class="review kind-border-{{ r.payload.kind if r.item_type == 'knowledge' else r.item_type }}">
+  <header class="review-head">
+    <span class="review-type">{{ r.item_type }}</span>
+    {% if r.confidence is not none %}<span class="review-conf">{{ (r.confidence * 100)|round|int }}%</span>{% endif %}
+  </header>
+
+  {{ prov_line(r) }}
+
+  <div class="review-body">
+    {% if r.item_type == 'knowledge' %}
+      <p class="review-lead">{{ kind_dot(r.payload.kind or 'observation') }} {{ r.payload.value }}</p>
+      <p class="review-sub">{{ r.prov_agent }} wants to record this
+        {{ r.payload.kind or 'observation' }} about <strong>{{ r.payload.entity }}</strong>.
+        Accept to commit it to your world model.</p>
+    {% elif r.item_type == 'duplicate' %}
+      <p class="review-lead">Possible duplicate <strong>{{ r.payload.entity_type }}</strong> “{{ r.payload.name }}”</p>
+      <p class="review-sub">{{ r.payload.entity_ids|length }} entities share this name — merge?</p>
+    {% elif r.item_type == 'discovery' %}
+      <p class="review-lead">{{ r.payload.summary }}</p>
+    {% elif r.item_type == 'relationship' %}
+      <p class="review-lead">Link <strong>#{{ r.payload.src_id }}</strong>
+        <span class="rel">{{ r.payload.type }}</span> <strong>#{{ r.payload.dst_id }}</strong></p>
+    {% else %}
+      <p class="review-lead">{{ r.payload }}</p>
+    {% endif %}
+  </div>
+
+  <footer class="review-actions">
+    <form hx-post="{{ r.action_url }}" hx-target="#review-list" hx-swap="innerHTML">
+      <button name="action" value="accept" class="btn btn-accept">Accept</button>
+      <button name="action" value="reject" class="btn btn-reject">Reject</button>
+    </form>
+  </footer>
+</article>
+{% endif %}
+{%- endmacro %}

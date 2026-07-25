@@ -1,0 +1,184 @@
+.agent-meta-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 36px;
+}
+.agent-meta-row dt {
+  flex-basis: auto;
+}
+.run-badge.idle {
+  color: var(--faint);
+}
+
+.proposal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.proposal {
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.proposal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.proposal-path {
+  font: 600 12.5px/1.4 var(--mono);
+  color: var(--copper);
+  word-break: break-all;
+}
+.proposal-head .group-open {
+  margin-left: auto;
+}
+
+.q-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.q-subject {
+  font: 600 11px/1 var(--mono);
+  color: var(--copper);
+}
+.q-text {
+  margin: 5px 0 0;
+  font-size: 14px;
+}
+
+/* entity registry */
+.registry-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 14px;
+  max-width: 66ch;
+}
+.registry {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.reg-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.reg-item:first-child {
+  border-top: 0;
+}
+.reg-type {
+  font: 600 8.5px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--line-2);
+  color: var(--faint);
+  flex: 0 0 auto;
+  width: 62px;
+  text-align: center;
+}
+.reg-person {
+  color: var(--observation);
+  border-color: color-mix(in srgb, var(--observation) 40%, var(--line));
+}
+.reg-place {
+  color: var(--fact);
+  border-color: color-mix(in srgb, var(--fact) 40%, var(--line));
+}
+.reg-project {
+  color: var(--idea);
+  border-color: color-mix(in srgb, var(--idea) 40%, var(--line));
+}
+.reg-org {
+  color: var(--copper);
+  border-color: color-mix(in srgb, var(--copper) 40%, var(--line));
+}
+.reg-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reg-track {
+  width: 90px;
+  height: 4px;
+  background: var(--line-2);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.reg-track i {
+  display: block;
+  height: 100%;
+  background: var(--copper);
+}
+.reg-badge {
+  font: 600 9.5px/1 var(--mono);
+  color: var(--ok);
+  white-space: nowrap;
+}
+.reg-count {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+  width: 78px;
+  text-align: right;
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.feed-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.feed-type {
+  font: 600 9px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ok);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 3px 6px;
+  flex: 0 0 auto;
+}
+.feed-type.failed {
+  color: var(--danger);
+}
+.feed-detail {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feed-time {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}

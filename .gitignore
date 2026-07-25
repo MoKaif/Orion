@@ -1,0 +1,34 @@
+# Secrets — never commit API keys (the MVP did; we don't)
+.env
+config/secrets.json
+config/*.local.json
+
+# Data & runtime — the whole dir is machine-local state
+data/*
+!data/.gitkeep
+logs/
+*.log
+
+# Legacy Windows-era Curator: the code is kept for reference, but its DB and note
+# backups are copies of the real vault (personal + work content). Never commit those.
+Curator/.orion_backups/
+Curator/*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node (interfaces/spa)
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Editors / tooling
+.claude/settings.local.json
+.idea/
+.vscode/
+*.swp
+.DS_Store

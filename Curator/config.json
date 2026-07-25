@@ -1,0 +1,56 @@
+{
+  "vaultPath": "D:\\Kaif\\Softlink\\Softlink",
+  "databasePath": "orion_curator.sqlite3",
+  "applyChanges": true,
+  "useOllama": true,
+  "ollamaUrl": "http://localhost:11434",
+  "ollamaModel": "qwen3.5:0.8b",
+  "ollamaTimeoutSeconds": 120,
+  "maxLlmChars": 6000,
+  "skipTimedOutLlmNotes": true,
+  "autoFixGrammar": true,
+  "autoTag": true,
+  "autoLink": true,
+  "autoBacklink": true,
+  "autoHubLinks": true,
+  "hubFolder": "Zettelkasten/Abstract",
+  "hubLinkSection": "Related Hubs",
+  "backlinkSection": "Backlinks",
+  "maxBacklinksPerNote": 20,
+  "maxHubLinksPerNote": 3,
+  "abstractHubs": {
+    "Daily Logs": {
+      "keywords": ["daily", "today", "yesterday", "worked on", "standup"],
+      "folders": ["6 - DevKnowledge"]
+    },
+    "Work": {
+      "keywords": ["project", "task", "requirement", "implementation", "client", "module"],
+      "folders": ["1 - Projects", "6 - DevKnowledge"]
+    },
+    "Bug": {
+      "keywords": ["error", "exception", "rca", "root cause", "duplicate submission", "stack trace", "regression"],
+      "folders": ["2 - Bugs"]
+    },
+    "Feature": {
+      "keywords": ["feature", "enhancement", "requirement", "proposed solution", "functional solution"],
+      "folders": ["1 - Projects", "3 - Designs"]
+    },
+    "Design": {
+      "keywords": ["design", "architecture", "tdd", "technical details", "ui specifications"],
+      "folders": ["3 - Designs"]
+    }
+  },
+  "autoMergeDuplicates": false,
+  "maxChangesPerRun": 25,
+  "maxLlmNotesPerRun": 1,
+  "minLlmConfidence": 0.85,
+  "scanIntervalMinutes": 5,
+  "backupBeforeChanges": true,
+  "allowedFolders": [],
+  "ignoredFolders": [
+    ".obsidian",
+    ".trash",
+    "Templates"
+  ],
+  "backupFolder": ".orion_backups"
+}

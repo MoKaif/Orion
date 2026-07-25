@@ -1,0 +1,25 @@
+{# Threads — every conversation is one thread against the same world model. #}
+<section class="view-head">
+  <div>
+    <p class="eyebrow">Conversations</p>
+    <h1 class="view-title">Threads</h1>
+  </div>
+  <button class="btn btn-primary" hx-get="/ui/chat" hx-target="#view">New chat</button>
+</section>
+
+{% if sessions %}
+<ul class="session-list">
+  {% for s in sessions %}
+  <li class="session" hx-get="/ui/chat?session_id={{ s.id }}" hx-target="#view" role="button" tabindex="0">
+    <span class="session-id">#{{ s.id }}</span>
+    <span class="session-title">{{ s.title or 'Untitled thread' }}</span>
+    <time class="session-time">{{ s.created_at }}</time>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty-state">
+  <span class="empty-glyph">≡</span>
+  <p>No threads yet. Start a chat and it will be filed here.</p>
+</div>
+{% endif %}

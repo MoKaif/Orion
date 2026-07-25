@@ -1,0 +1,9 @@
+.theme-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--muted);
+  font-size: 12px;
+}
+.theme-toggle:hover {
+  color: var(--copper-2);
+}

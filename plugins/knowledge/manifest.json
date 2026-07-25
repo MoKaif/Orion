@@ -1,0 +1,12 @@
+{
+  "name": "knowledge",
+  "version": "0.1.0",
+  "specialists": [],
+  "tools": ["vault_search", "vault_read"],
+  "entity_types": ["note", "concept"],
+  "relationship_types": ["mentions", "originated_from"],
+  "background_jobs": [{ "name": "index_vault", "cron": "0 * * * *" }],
+  "api_routes": [],
+  "dashboard_widgets": ["recent_discoveries"],
+  "permissions": ["read_vault"]
+}

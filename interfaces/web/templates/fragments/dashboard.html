@@ -1,0 +1,100 @@
+{% import "fragments/_macros.html" as m %}
+{# The desk — the archive's landing view. #}
+<section class="view-head">
+  <div>
+    <p class="eyebrow">The archive</p>
+    <h1 class="view-title">At your desk, Kaif.</h1>
+  </div>
+  <p class="view-note">Orion files what it learns and only surfaces what needs your judgement.</p>
+</section>
+
+<div class="grid">
+
+  <!-- Awaiting review: the inbox, front and centre -->
+  <section class="card span-2 card-focus">
+    <header class="card-head">
+      <h2>Awaiting review</h2>
+      <span class="count {{ 'count-alert' if reviews else '' }}">{{ reviews|length }}</span>
+    </header>
+    {% if reviews %}
+    <div class="review-strip">
+      {% for r in reviews[:4] %}{{ m.review_card(r) }}{% endfor %}
+    </div>
+    {% if reviews|length > 4 %}
+    <button class="link-more" hx-get="/ui/reviews" hx-target="#view">
+      review all {{ reviews|length }} →</button>
+    {% endif %}
+    {% else %}
+    <p class="empty">Nothing to review. Orion hasn't inferred anything it isn't already sure of.</p>
+    {% endif %}
+  </section>
+
+  <!-- Active workspaces -->
+  <section class="card">
+    <header class="card-head"><h2>Workspaces</h2>
+      <span class="count">{{ workspaces|length }}</span></header>
+    {% if workspaces %}
+    <ul class="ws-list">
+      {% for w in workspaces %}
+      <li class="ws">
+        <span class="ws-name">{{ w.name }}</span>
+        {% if w.goal %}<span class="ws-goal">{{ w.goal }}</span>{% endif %}
+        <span class="ws-facts">{{ w.facts }} facts</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">No active workspaces yet. They form as ideas grow into work.</p>
+    {% endif %}
+  </section>
+
+  <!-- Recently filed -->
+  <section class="card">
+    <header class="card-head"><h2>Recently filed</h2>
+      <span class="legend">
+        <span class="kind kind-fact">Fact</span>
+        <span class="kind kind-observation">Obs</span>
+        <span class="kind kind-idea">Idea</span>
+      </span>
+    </header>
+    {% if knowledge %}
+    <div class="kchips">
+      {% for k in knowledge %}{{ m.knowledge_chip(k) }}{% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Nothing filed yet. Chat or ingest your vault to begin.</p>
+    {% endif %}
+  </section>
+
+  <!-- Plugin widgets: contributed by plugins without touching this template (Manifesto §9) -->
+  {% for w in widgets %}
+  <section class="card" data-widget="{{ w.name }}">
+    <header class="card-head"><h2>{{ w.title }}</h2></header>
+    {{ w.html|safe }}
+  </section>
+  {% endfor %}
+
+  <!-- The ledger: recent activity with dotted leaders -->
+  <section class="card span-2">
+    <header class="card-head"><h2>Ledger</h2></header>
+    {% if activity %}
+    <ol class="feed">
+      {% for e in activity %}
+      <li class="feed-item">
+        <span class="feed-type">{{ e.type }}</span>
+        <span class="feed-detail">
+          {%- if e.entity %}{{ e.entity }}{% endif -%}
+          {%- if e.payload.proposed is defined %} · proposed {{ e.payload.proposed }}{% endif -%}
+          {%- if e.payload.summary %} · {{ e.payload.summary }}{% endif -%}
+        </span>
+        <i class="leader" aria-hidden="true"></i>
+        <time class="feed-time">{{ e.occurred_at }}</time>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="empty">No entries yet. The ledger fills as Orion works.</p>
+    {% endif %}
+  </section>
+
+</div>

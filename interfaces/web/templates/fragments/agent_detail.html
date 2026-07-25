@@ -1,0 +1,124 @@
+{# One agent's page: live status, pending work (Curator proposals), and the run log.
+   While the job runs, the view refreshes itself every 6s so progress is visible. #}
+{% macro diff_block(diff) -%}
+<pre class="diffview">{% for line in diff.split('\n') -%}
+<span class="dl {{ 'dl-hunk' if line.startswith('@@') else 'dl-meta' if line.startswith('+++') or line.startswith('---') else 'dl-add' if line.startswith('+') else 'dl-del' if line.startswith('-') else '' }}">{{ line }}</span>
+{% endfor %}</pre>
+{%- endmacro %}
+
+<div {% if job.running_since %}hx-get="/ui/agents/{{ job.name }}" hx-trigger="every 6s"
+     hx-target="#view" hx-swap="innerHTML"{% endif %}>
+
+<section class="view-head">
+  <div>
+    <p class="eyebrow">Agent</p>
+    <h1 class="view-title">{{ job.name.replace('_', ' ') }}</h1>
+  </div>
+  <div class="agent-actions">
+    <button class="btn" hx-get="/ui/agents" hx-target="#view" hx-swap="innerHTML">← All agents</button>
+    <button class="btn btn-primary" {{ 'disabled' if job.running_since else '' }}
+            hx-post="/ui/agents/{{ job.name }}/run" hx-target="#view" hx-swap="innerHTML">
+      {{ 'Running…' if job.running_since else 'Run now' }}</button>
+  </div>
+</section>
+
+<div class="grid">
+
+  <!-- Status -->
+  <section class="card span-2">
+    <header class="card-head"><h2>Status</h2>
+      {% if job.running_since %}<span class="run-badge running">running since {{ job.running_since }}</span>
+      {% else %}<span class="run-badge idle">idle</span>{% endif %}
+    </header>
+    <dl class="agent-meta agent-meta-row">
+      <div><dt>schedule</dt><dd>{{ job.cron }}</dd></div>
+      <div><dt>next run</dt><dd>{{ job.next_run or 'manual only' }}</dd></div>
+      <div><dt>last run</dt><dd>{{ job.last_run or 'never' }}</dd></div>
+      <div><dt>last result</dt><dd class="agent-result">{{ job.last_result or '—' }}</dd></div>
+    </dl>
+  </section>
+
+  {% if questions %}
+  <!-- Gap-finding: the model asks when it can't resolve something. One line each. -->
+  <section class="card span-2">
+    <header class="card-head"><h2>Questions for you</h2>
+      <span class="count count-alert">{{ questions|length }}</span>
+    </header>
+    <div class="proposal-list">
+      {% for q in questions %}
+      <article class="proposal">
+        <header class="proposal-head">
+          <span class="proposal-path">{{ q.subject }}</span>
+          <span class="proposal-meta">#{{ q.id }}</span>
+        </header>
+        <p class="q-text">{{ q.question }}</p>
+        <form class="q-form" hx-post="/ui/curator/questions/{{ q.id }}" hx-target="#view" hx-swap="innerHTML">
+          <input class="q-input" name="answer" placeholder="your answer…" autocomplete="off">
+          <button class="btn btn-accept" type="submit">Answer</button>
+          <button class="btn btn-reject" name="answer" value="__dismiss__" type="submit">Dismiss</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if proposals is not none %}
+  <!-- Curator's pending proposals: grammar fixes, backlinks, and new entity notes.
+       The diff is the whole story — approve or reject each. -->
+  <section class="card span-2">
+    <header class="card-head"><h2>Proposals awaiting review</h2>
+      <span class="count {{ 'count-alert' if proposals else '' }}">{{ proposals|length }}</span>
+    </header>
+    {% if proposals %}
+    <div class="proposal-list">
+      {% for p in proposals %}
+      <article class="proposal">
+        <header class="proposal-head">
+          <span class="kind-badge kind-{{ p.kind or 'grammar' }}">{{ (p.kind or 'grammar').replace('_', ' ') }}</span>
+          <span class="proposal-path">{{ p.path }}</span>
+          {% if p.obsidian_uri %}
+          <a class="proposal-open" href="{{ p.obsidian_uri }}"
+             title="Open this note in Obsidian and make the highlighted edits by hand">edit in Obsidian ↗</a>
+          {% endif %}
+          <span class="proposal-meta">#{{ p.id }} · {{ p.created_at }}</span>
+        </header>
+        {{ diff_block(p.diff) }}
+        <footer class="review-actions">
+          <form hx-post="/ui/curator/{{ p.id }}" hx-target="#view" hx-swap="innerHTML">
+            <button name="action" value="apply" class="btn btn-accept">
+              {{ 'Create note' if p.kind == 'entity_note' else 'Apply (backs up first)' }}</button>
+            <button name="action" value="reject" class="btn btn-reject">Reject</button>
+          </form>
+          <span class="proposal-hint">edited it in Obsidian yourself? reject this — the next scan re-reads the note.</span>
+        </footer>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Nothing waiting. Run the agent to scan more notes.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- Run log -->
+  <section class="card span-2">
+    <header class="card-head"><h2>Run log</h2><span class="count">{{ runs|length }}</span></header>
+    {% if runs %}
+    <ol class="feed">
+      {% for r in runs %}
+      <li class="feed-item">
+        <span class="feed-type {{ '' if r.ok else 'feed-type-failed' }}">{{ 'ok' if r.ok else 'failed' }}</span>
+        <span class="feed-detail">{{ r.result }}</span>
+        <i class="leader" aria-hidden="true"></i>
+        <time class="feed-time">{{ r.at }} · {{ r.seconds }}s</time>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="empty">No runs recorded yet.</p>
+    {% endif %}
+  </section>
+
+</div>
+</div>

@@ -1,0 +1,22 @@
+{
+  "//": "Per-tool enable flags. Tools registered by plugins respect these by name prefix.",
+  "enabled": {
+    "vault": true,
+    "files": true,
+    "notes": true,
+    "playground": true,
+    "web_search": true,
+    "memory": true,
+    "shell": true
+  },
+  "shell": {
+    "requires_confirm": true,
+    "timeout_seconds": 20,
+    "blocked_commands": ["rm -rf", "mkfs", "dd", ":(){:|:&};:", "shutdown", "reboot"]
+  },
+  "selection": {
+    "//": "RAG-based tool selection (M2): only top-K tool schemas per message.",
+    "top_k": 5,
+    "always_available": ["manage_memory", "ask_user"]
+  }
+}

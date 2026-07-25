@@ -1,0 +1,98 @@
+{# Agents — Orion's background life. Every vault/Obsidian pass is owned by the Curator, so
+   those are grouped as sub-agents under one umbrella; other jobs stand on their own. #}
+<section class="view-head">
+  <div>
+    <p class="eyebrow">Background life</p>
+    <h1 class="view-title">Agents</h1>
+  </div>
+  <p class="view-note">Orion's own work while you're away. Each agent runs on its schedule — or right now, if you say so.</p>
+</section>
+
+{% macro job_meta(job) -%}
+<dl class="agent-meta agent-meta-row">
+  <div><dt>schedule</dt><dd>{{ job.cron }}</dd></div>
+  <div><dt>next run</dt><dd>{{ job.next_run or 'manual only' }}</dd></div>
+  <div><dt>last run</dt><dd>{{ job.last_run or 'never' }}</dd></div>
+</dl>
+{%- endmacro %}
+
+{% macro run_status(job, last) -%}
+{% if job.running_since %}<span class="run-badge running">running</span>
+{% elif last and not last.ok %}<span class="run-badge failed">failed</span>{% endif %}
+{%- endmacro %}
+
+{% if curator_jobs %}
+{# The Curator umbrella: the vault's resident editor + memory-builder. Its passes all feed the
+   inbox, so the review count and link point there. #}
+<section class="card agent-card curator-agent">
+  <header class="card-head">
+    <div>
+      <p class="eyebrow">Obsidian vault</p>
+      <h2>Curator</h2>
+    </div>
+    {% if pending.get('curator') %}
+    <button class="count count-alert" hx-get="/ui/reviews" hx-target="#view" hx-swap="innerHTML"
+            title="Review Curator's proposals in the inbox">{{ pending['curator'] }} to review →</button>
+    {% endif %}
+  </header>
+  <p class="agent-blurb">Reads, edits, and mines your Obsidian vault. Every pass proposes — nothing
+    touches a note or your world model until you approve it in the inbox.</p>
+
+  <ul class="subagent-list">
+    {% for c in curator_jobs %}
+    {% set j = c.job %}
+    {% set last = runs.get(j.name, [None])[0] if runs.get(j.name) else none %}
+    <li class="subagent">
+      <div class="subagent-main">
+        <span class="subagent-name">{{ c.label }}</span>
+        {{ run_status(j, last) }}
+        <span class="subagent-cron">{{ j.cron }} · next {{ j.next_run or 'manual' }}</span>
+      </div>
+      <div class="subagent-actions">
+        <button class="btn btn-sm" hx-get="/ui/agents/{{ j.name }}" hx-target="#view" hx-swap="innerHTML">Details</button>
+        <button class="btn btn-sm btn-primary" {{ 'disabled' if j.running_since else '' }}
+                hx-post="/ui/agents/{{ j.name }}/run" hx-target="#view" hx-swap="innerHTML">Run now</button>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if other_jobs %}
+<div class="grid">
+  {% for j in other_jobs %}
+  {% set last = runs.get(j.name, [None])[0] if runs.get(j.name) else none %}
+  <section class="card agent-card">
+    <header class="card-head">
+      <h2>{{ j.name.replace('_', ' ') }}</h2>
+      {{ run_status(j, last) }}
+    </header>
+
+    <dl class="agent-meta">
+      <div><dt>schedule</dt><dd>{{ j.cron }}</dd></div>
+      <div><dt>next run</dt><dd>{{ j.next_run or 'manual only' }}</dd></div>
+      <div><dt>last run</dt><dd>{{ j.last_run or 'never' }}</dd></div>
+      {% if last %}
+      <div><dt>last result</dt><dd class="agent-result">{{ last.result }}</dd></div>
+      {% endif %}
+    </dl>
+
+    <footer class="agent-actions">
+      <button class="btn" hx-get="/ui/agents/{{ j.name }}" hx-target="#view" hx-swap="innerHTML">
+        Details</button>
+      <button class="btn btn-primary" {{ 'disabled' if j.running_since else '' }}
+              hx-post="/ui/agents/{{ j.name }}/run" hx-target="#view" hx-swap="innerHTML">
+        Run now</button>
+    </footer>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not curator_jobs and not other_jobs %}
+<div class="empty-state">
+  <span class="empty-glyph">◇</span>
+  <p>No agents registered. Plugins contribute them as background jobs.</p>
+</div>
+{% endif %}

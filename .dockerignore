@@ -1,0 +1,22 @@
+# Keep the build context (and image layers) small and secret-free.
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.gitignore
+
+# Mounted at runtime via compose — never bake host state into the image.
+data/
+# The API key is bind-mounted from ./config at runtime; never copy it into a layer.
+config/secrets.json
+
+# SPA: node_modules is huge and dist is rebuilt in the node stage — never ship host copies.
+interfaces/spa/node_modules/
+interfaces/spa/dist/
+
+# Docker's own files
+Dockerfile
+.dockerignore
+docker-compose.yml

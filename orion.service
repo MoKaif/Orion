@@ -1,0 +1,20 @@
+# Orion as an always-on service on the Arch laptop.
+# Install:  cp orion.service ~/.config/systemd/user/  &&  systemctl --user enable --now orion
+# (Ollama runs as its own service; Orion depends on it being reachable but does not manage it.)
+[Unit]
+Description=Orion — Personal Knowledge Operating System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Orion
+ExecStart=%h/Orion/.venv/bin/python run.py
+Restart=always
+RestartSec=5
+# Keep it a good citizen on a shared, low-RAM machine.
+Nice=5
+MemoryMax=2G
+
+[Install]
+WantedBy=default.target

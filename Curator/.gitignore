@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+orion_curator.sqlite3
+.orion_backups/

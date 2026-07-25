@@ -1,0 +1,23 @@
+# Orion as an on-demand Docker service, controlled on/off by NoxCtl.
+#   NoxCtl start  -> docker compose -f this up -d
+#   NoxCtl stop   -> docker compose -f this down
+#
+# Host networking is deliberate: Orion's local brain is host Ollama at
+# localhost:11434, and host mode both reaches it and publishes Orion on the
+# host's :8020 for LAN devices — no port mapping or bridge gymnastics.
+services:
+  orion:
+    build: .
+    container_name: orion            # must match services.yaml container_name for NoxCtl status
+    restart: unless-stopped          # survives reboots; a NoxCtl "stop" (compose down) stays down
+    network_mode: host
+    volumes:
+      - ./data:/app/data             # SQLite world model + usage.json
+      - ./data/models:/tmp/fastembed_cache  # fastembed ONNX model — downloaded once, reused
+      - ./config:/app/config         # settings/models/jobs + gitignored secrets.json (Claude key)
+      # Obsidian vault, mounted at the same path as on the host so settings.json's
+      # vault.path works both bare-metal and in-container. Read-write: Curator applies
+      # user-approved grammar fixes here (backups land in ./data/curator_backups).
+      - /home/nox/Nox:/home/nox/Nox
+    environment:
+      - PYTHONUNBUFFERED=1

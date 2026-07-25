@@ -1,0 +1,47 @@
+{# The ledger line — live vitals. Swapped into #telemetry every 15s. #}
+<span id="tele-pending-src" data-pending="{{ v.stats.pending_reviews }}" hidden></span>
+
+<div class="tele-group">
+  <div class="tele {{ 'is-alert' if v.stats.pending_reviews else '' }}" title="Items awaiting your review">
+    <span class="tele-val">{{ v.stats.pending_reviews }}</span>
+    <span class="tele-lbl">to review</span>
+  </div>
+  <div class="tele" title="Committed knowledge items">
+    <span class="tele-val">{{ v.stats.knowledge }}</span>
+    <span class="tele-lbl">filed</span>
+  </div>
+  <div class="tele" title="Entities in the world model">
+    <span class="tele-val">{{ v.stats.entities }}</span>
+    <span class="tele-lbl">entities</span>
+  </div>
+  <div class="tele" title="Accepted relationships">
+    <span class="tele-val">{{ v.stats.relationships }}</span>
+    <span class="tele-lbl">links</span>
+  </div>
+</div>
+
+<div class="tele-group tele-right">
+  <div class="tele tele-tokens"
+       title="Token spend today vs daily ceiling{% for m, r in v.usage.by_model.items() %}&#10;{{ m }}: {{ '{:,}'.format(r.input + r.output + r.cache_read + r.cache_write) }} tok · ${{ '%.4f'|format(r.cost_usd) }}{% endfor %}">
+    <div>
+      <span class="tele-val">{{ '{:,}'.format(v.usage.spent) }}</span>
+      <span class="tele-lbl">tokens</span>
+    </div>
+    {% if v.usage.ceiling %}
+    <span class="meter" style="--pct: {{ (v.usage.fraction * 100)|round(1) }}%"
+          data-warn="{{ 1 if v.usage.fraction >= 0.8 else 0 }}"><i></i></span>
+    {% endif %}
+  </div>
+  <div class="tele tele-cost" title="Estimated cloud spend today (per-model breakdown on the tokens tile)">
+    <span class="tele-val">${{ '%.4f'|format(v.usage.cost_usd) }}</span>
+    <span class="tele-lbl">today</span>
+  </div>
+  <div class="status-dots">
+    <span class="dot {{ 'up' if v.ollama_up else 'down' }}"
+          title="Local model (Ollama) {{ 'reachable' if v.ollama_up else 'offline' }}">
+      <i></i>local</span>
+    <span class="dot {{ 'up' if v.anthropic_up else 'off' }}"
+          title="Cloud brain (Claude) {{ 'configured' if v.anthropic_up else 'disabled' }}">
+      <i></i>cloud</span>
+  </div>
+</div>

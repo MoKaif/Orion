@@ -1,0 +1,27 @@
+{
+  "backend": "sqlite",
+  "db_path": "data/orion.db",
+
+  "vectors": {
+    "backend": "sqlite-vec",
+    "dim": 384,
+    "lanes": ["fastembed", "custom"]
+  },
+
+  "conversation": {
+    "compress_after": 14,
+    "recent_turns": 4
+  },
+
+  "recall": {
+    "//": "Knowledge items pulled into each turn's context. Chat now routes to cloud DeepSeek,",
+    "//2": "so the old local-CPU prefill ceiling no longer applies — more context per turn is cheap.",
+    "limit": 8
+  },
+
+  "knowledge": {
+    "//": "Confidence >= auto_accept skips the review inbox; below review_floor is discarded.",
+    "auto_accept": 1.0,
+    "review_floor": 0.5
+  }
+}

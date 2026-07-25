@@ -1,0 +1,26 @@
+{
+  "name": "software",
+  "version": "0.1.0",
+  "specialists": [
+    "software"
+  ],
+  "tools": [
+    "read_file",
+    "shell"
+  ],
+  "entity_types": [
+    "repository",
+    "codefile"
+  ],
+  "relationship_types": [
+    "depends_on",
+    "imports"
+  ],
+  "background_jobs": [],
+  "api_routes": [],
+  "dashboard_widgets": [],
+  "permissions": [
+    "read_files",
+    "run_shell"
+  ]
+}

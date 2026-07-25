@@ -1,0 +1,105 @@
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-num {
+  font-family: var(--serif);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--copper-2);
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font: 600 9.5px/1 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.dash-inbox {
+  margin-bottom: 20px;
+}
+.dash-preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-preview li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.dash-preview li:first-child {
+  border-top: 0;
+}
+.dash-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+/* fallback styling for plugin-contributed widget HTML */
+.widget-body .ws-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.widget-body .ws {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.widget-body .ws-facts {
+  font: 500 11px/1.4 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.widget-body .note-link {
+  color: var(--copper);
+}
+.widget-body .empty {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.widget-body .link-more,
+.widget-body button {
+  margin-top: 10px;
+  background: none;
+  border: 1px solid var(--line-2);
+  color: var(--copper);
+  font: 500 12px/1 var(--mono);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}

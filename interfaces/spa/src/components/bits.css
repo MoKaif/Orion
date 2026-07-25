@@ -1,0 +1,98 @@
+/* knowledge classification stamp */
+.stamp {
+  display: inline-block;
+  font: 700 9.5px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 6px 3px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(-3deg);
+}
+.stamp-fact {
+  color: var(--fact);
+}
+.stamp-observation {
+  color: var(--observation);
+}
+.stamp-idea {
+  color: var(--idea);
+}
+
+/* agent provenance chip */
+.agent-chip {
+  font: 700 9px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 4px 7px 3px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(-1.5deg);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.agent-curator {
+  color: var(--copper);
+}
+.agent-chat {
+  color: var(--observation);
+}
+.agent-consolidation {
+  color: var(--idea);
+}
+
+/* diff */
+.diffview {
+  margin: 0;
+  font: 12px/1.65 var(--mono);
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.diffview .dl {
+  display: block;
+  white-space: pre;
+}
+.diffview .dl-add {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+.diffview .dl-del {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+.diffview .dl-hunk {
+  color: var(--copper);
+}
+.diffview .dl-meta {
+  color: var(--faint);
+}
+
+/* confidence meter */
+.confmeter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.confmeter .track {
+  display: block;
+  height: 4px;
+  width: 44px;
+  background: var(--line-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.confmeter .track i {
+  display: block;
+  height: 100%;
+  background: var(--copper);
+  border-radius: 3px;
+}
+.confmeter b {
+  font: 600 10.5px/1 var(--mono);
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}

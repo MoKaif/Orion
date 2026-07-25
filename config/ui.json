@@ -1,0 +1,10 @@
+{
+  "theme": "dark",
+  "layout": "mixed",
+  "sidebar_collapsed": false,
+  "compact_mode": false,
+  "font_size": "medium",
+  "show_inference_time": true,
+  "show_token_estimate": true,
+  "distraction_free": false
+}
