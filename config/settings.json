@@ -13,6 +13,12 @@
     "path": "/home/nox/Nox",
     "extensions": [
       ".md"
+    ],
+    "//ignore": "Folders never indexed. Dot-folders are skipped anyway; .trash matters most — notes you deleted in Obsidian stay on disk and would otherwise be indexed as real notes.",
+    "ignore": [
+      ".trash",
+      ".obsidian",
+      "Templates"
     ]
   }
 }

@@ -118,10 +118,13 @@ def register_mention(c, mention: dict[str, str], embed_cache: dict[str, list[flo
         c.execute("UPDATE entities SET mentions=mentions+1, aliases=?, updated_at=? WHERE id=?",
                   (json.dumps(sorted(aliases)), store.now(), eid))
         c.commit()
-        # a fuzzy (non-exact) resolve is worth a confirmation question
+        # A fuzzy (non-exact) resolve is worth confirming. The merge has *already* happened
+        # optimistically, so the question records which entity absorbed which alias — that's
+        # what lets "no, different" actually split them back apart.
         if 0 < score < 1.0:
             ask(c, display(mention["name"]),
-                f'Is "{mention["name"]}" the same as "{row["name"]}"?')
+                f'Is "{mention["name"]}" the same as "{row["name"]}"?',
+                kind="same_as", entity_id=eid, alias=mention["name"])
         return eid
     cur = c.execute(
         "INSERT INTO entities (canonical, name, type, aliases, mentions, status, "
@@ -181,23 +184,75 @@ def approved_entities(c) -> list[dict[str, Any]]:
 
 
 # -- gap questions ---------------------------------------------------------
-def ask(c, subject: str, question: str) -> None:
+def ask(c, subject: str, question: str, kind: str = "open",
+        entity_id: int | None = None, alias: str | None = None) -> None:
     exists = c.execute(
         "SELECT 1 FROM questions WHERE subject=? AND question=? AND status='open'",
         (subject, question)).fetchone()
     if exists:
         return
-    c.execute("INSERT INTO questions (subject, question, status, created_at) "
-              "VALUES (?,?, 'open', ?)", (subject, question, store.now()))
+    c.execute("INSERT INTO questions (subject, question, kind, entity_id, alias, status, "
+              "created_at) VALUES (?,?,?,?,?, 'open', ?)",
+              (subject, question, kind, entity_id, alias, store.now()))
     c.commit()
 
 
 def open_questions(c) -> list[dict[str, Any]]:
-    return [dict(r) for r in c.execute(
-        "SELECT * FROM questions WHERE status='open' ORDER BY id DESC")]
+    """Open questions, each carrying the entity it concerns so the UI can say what's at stake."""
+    out = []
+    for r in c.execute("SELECT * FROM questions WHERE status='open' ORDER BY id DESC"):
+        q = dict(r)
+        if q.get("entity_id"):
+            row = c.execute("SELECT name, type, mentions, aliases FROM entities WHERE id=?",
+                            (q["entity_id"],)).fetchone()
+            if row:
+                q["entity"] = {"name": row["name"], "type": row["type"],
+                               "mentions": row["mentions"],
+                               "aliases": json.loads(row["aliases"] or "[]")}
+        out.append(q)
+    return out
 
 
-def answer_question(c, qid: int, answer: str) -> None:
+def answer_question(c, qid: int, answer: str) -> dict[str, Any]:
+    """Record an answer **and act on it**.
+
+    For a ``same_as`` question the merge already happened when the mention was seen, so:
+      * "yes"  confirms it — the alias stays folded into the entity;
+      * "no"   splits it — the alias is removed from that entity, its mention count is given
+        back, and the surface form becomes its own pending entity.
+    Anything else is kept as a free-text note on the question.
+    """
+    row = c.execute("SELECT * FROM questions WHERE id=?", (qid,)).fetchone()
+    if row is None:
+        return {"ok": False, "reason": "no such question"}
+    q = dict(row)
+    verdict = (answer or "").strip().lower()
+    outcome = "recorded"
+
+    if q.get("kind") == "same_as" and q.get("entity_id") and q.get("alias"):
+        if verdict in ("yes", "y", "same", "true"):
+            outcome = "confirmed"
+        elif verdict in ("no", "n", "different", "false"):
+            outcome = _split_alias(c, int(q["entity_id"]), q["alias"], q.get("subject") or "")
     c.execute("UPDATE questions SET answer=?, status='answered', answered_at=? WHERE id=?",
               (answer, store.now(), qid))
     c.commit()
+    return {"ok": True, "outcome": outcome}
+
+
+def _split_alias(c, entity_id: int, alias: str, subject: str) -> str:
+    """Undo an optimistic merge: pull ``alias`` off the entity and give it its own row."""
+    row = c.execute("SELECT * FROM entities WHERE id=?", (entity_id,)).fetchone()
+    if row is None:
+        return "entity already gone"
+    aliases = [a for a in json.loads(row["aliases"] or "[]") if a.lower() != alias.lower()]
+    c.execute("UPDATE entities SET aliases=?, mentions=MAX(mentions-1, 0), updated_at=? WHERE id=?",
+              (json.dumps(sorted(aliases)), store.now(), entity_id))
+    canon = canonical(alias)
+    existing = c.execute("SELECT id FROM entities WHERE canonical=?", (canon,)).fetchone()
+    if existing is None:
+        c.execute("INSERT INTO entities (canonical, name, type, aliases, mentions, status, "
+                  "created_at, updated_at) VALUES (?,?,?,?,1,'pending',?,?)",
+                  (canon, display(subject or alias), row["type"], json.dumps([alias]),
+                   store.now(), store.now()))
+    return "split"

@@ -175,3 +175,144 @@
   color: var(--idea);
   border-color: color-mix(in srgb, var(--idea) 40%, var(--line));
 }
+.kind-question,
+.kind-duplicate,
+.kind-discovery {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--observation);
+  border-color: color-mix(in srgb, var(--observation) 40%, var(--line));
+}
+
+/* ---- what the card is, and what saying yes does ------------------------ */
+.item-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--fg);
+  line-height: 1.35;
+}
+.item-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 74ch;
+}
+/* the sentence that was missing: the consequence, stated before the buttons */
+.item-effect {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--copper) 7%, var(--inset));
+  border: 1px solid color-mix(in srgb, var(--copper) 20%, var(--line));
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.item-effect svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--copper);
+}
+.item-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+.btn.armed {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ---- duplicate: both copies, side by side ------------------------------ */
+.dup {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.dup-side {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--inset);
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.dup-side:first-child {
+  border-top: 0;
+}
+.dup-keep {
+  background: color-mix(in srgb, var(--ok) 8%, var(--inset));
+}
+.dup-role {
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  flex: 0 0 auto;
+  width: 68px;
+}
+.dup-keep .dup-role {
+  color: var(--ok);
+}
+.dup-drop .dup-role {
+  color: var(--danger);
+}
+.dup-path {
+  font: 500 12px/1.4 var(--mono);
+  color: var(--fg);
+  word-break: break-all;
+}
+.dup-drop .dup-path {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.dup-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 10px/1 var(--mono);
+  color: var(--danger);
+  white-space: nowrap;
+}
+.dup-count {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* ---- answering a question ---------------------------------------------- */
+.answer {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.answer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--inset);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 7px 10px;
+}
+.answer-input:focus {
+  outline: none;
+  border-color: var(--copper);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--copper) 20%, transparent);
+}

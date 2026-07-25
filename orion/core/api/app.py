@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from starlette.requests import Request
 
 from orion import __version__
-from orion.core import agents, identity, orchestrator, plugins
+from orion.core import agents, identity, inbox, orchestrator, plugins
 from orion.core.config import config
 from orion.core.constitution import constitution
 from orion.core.scheduler import scheduler
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
     maintenance.register_core_jobs()          # nightly consolidate + weekly briefing
     indexed = selection.index_tools()         # embed tool descriptions for RAG selection
     log.info("plugins loaded: %s | tools indexed: %d", loaded or "none", indexed)
+    _register_spa_fallback()                  # last, so it can't shadow a plugin's routes
     await scheduler.start()                    # idle-by-default background lifecycle
     yield
     await scheduler.stop()
@@ -470,32 +471,67 @@ def _provenance(source: str | None) -> tuple[str, str, str]:
     return ("Orion", source or "an internal inference", "")
 
 
+#: What accepting a world-model item does, said in the user's terms. A card without one of
+#: these is a card the user cannot judge — which is how "duplicate" ended up unreadable.
+def _world_model_card(r: dict) -> dict:
+    payload = r.get("payload") or {}
+    item_type = r["item_type"]
+    agent, label, uri = _provenance(payload.get("source"))
+    card: dict = {
+        "origin": "world_model", "id": r["id"], "item_type": item_type,
+        "payload": payload, "confidence": r.get("confidence"),
+        "created_at": r.get("created_at") or "",
+        "prov_agent": agent, "prov_label": label, "prov_uri": uri,
+        "action_url": f"/ui/reviews/{r['id']}",
+        "actions": [inbox.action("Accept", "accept", "accept"),
+                    inbox.action("Reject", "reject", "reject")],
+    }
+
+    if item_type == "knowledge":
+        entity = payload.get("entity", "you")
+        kind = payload.get("kind", "observation")
+        card["title"] = f"Remember this {kind} about {entity}"
+        card["effect"] = (f"Adds it to what Orion knows about {entity}, where it can surface "
+                          f"in future conversations. You can change or remove it later.")
+    elif item_type == "relationship":
+        card["title"] = "Link two things together"
+        card["effect"] = "Records the connection in the world model."
+    elif item_type == "duplicate":
+        plan = world_model.duplicate_plan(payload)
+        name, etype = payload.get("name", "?"), payload.get("entity_type", "entity")
+        card["title"] = f"Two “{name}” {etype}s look like the same thing"
+        card["plan"] = plan
+        card["effect"] = plan["effect"]
+        obsolete = plan["action"] == "gone"
+        verb = {"discard": "Discard the stale copy", "merge": "Merge them",
+                "gone": "Clear this notice"}[plan["action"]]
+        card["actions"] = [
+            inbox.action(verb, "accept", "accept",
+                         confirm=None if obsolete
+                         else "This deletes rows. Click again to confirm."),
+            inbox.action("Dismiss" if obsolete else "Keep both", "reject", "reject"),
+        ]
+    elif item_type == "discovery":
+        card["title"] = payload.get("kind", "discovery").replace("_", " ").capitalize()
+        card["body"] = payload.get("summary", "")
+        card["effect"] = "Marks it read. Nothing in the world model changes."
+        card["actions"] = [inbox.action("Got it", "accept", "accept"),
+                           inbox.action("Dismiss", "reject", "reject")]
+    else:
+        card["title"] = item_type.replace("_", " ").capitalize()
+        card["effect"] = "Files this notice away."
+    return card
+
+
 def _inbox_items() -> list[dict]:
-    """The unified inbox: every world-model inference *and* every pending Curator note edit,
-    each normalized to one shape (see the `review_card` macro) and sorted newest-first."""
-    items: list[dict] = []
-    for r in world_model.pending_reviews():
-        payload = r.get("payload") or {}
-        agent, label, uri = _provenance(payload.get("source"))
-        items.append({
-            "origin": "world_model", "id": r["id"], "item_type": r["item_type"],
-            "payload": payload, "confidence": r.get("confidence"),
-            "created_at": r.get("created_at") or "",
-            "prov_agent": agent, "prov_label": label, "prov_uri": uri,
-            "action_url": f"/ui/reviews/{r['id']}",
-        })
-    for p in (_curator_proposals() or []):
-        path = p.get("path", "")
-        name = path.rsplit("/", 1)[-1].removesuffix(".md")
-        kind = "journal note" if "Journal" in path else "note"
-        items.append({
-            "origin": "curator", "id": p["id"], "kind": p.get("kind", "grammar"),
-            "diff": p.get("diff", ""), "created_at": p.get("created_at") or "",
-            "prov_agent": "Curator", "prov_label": f"your {kind} {name}",
-            "prov_uri": p.get("obsidian_uri"),
-            "action_url": f"/ui/inbox/curator/{p['id']}",
-        })
-    items.sort(key=lambda x: x["created_at"], reverse=True)
+    """The one queue: world-model inferences plus whatever plugins have registered, newest first.
+
+    Core no longer reaches into Curator to build this — plugins contribute through
+    ``plugin_sdk.add_inbox_source``.
+    """
+    items = [_world_model_card(r) for r in world_model.pending_reviews()]
+    items += inbox.items()
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return items
 
 
@@ -597,12 +633,25 @@ async def index(request: Request):
     return _spa_index() or await legacy_index(request)
 
 
-# SPA client-side routes (/inbox, /agents/…, /chat, …) — anything not matched by an API,
-# /ui, /static, /assets, or /docs route falls through here and gets the SPA shell so a hard
-# refresh on a deep link still works. Registered last so it never shadows a real endpoint.
-@app.get("/{full_path:path}", response_class=HTMLResponse)
 async def spa_fallback(full_path: str, request: Request):
+    """SPA client-side routes (/inbox, /agents/…, /chat, …) — anything not matched by a real
+    route falls through here and gets the SPA shell, so a hard refresh on a deep link works."""
     spa = _spa_index()
     if spa is not None:
         return spa
     return HTMLResponse("Not found", status_code=404)
+
+
+def _register_spa_fallback() -> None:
+    """Add the catch-all **after** plugin routers are mounted.
+
+    Starlette matches routes in registration order, so a catch-all added at import time
+    shadows everything mounted later during startup: every plugin GET route
+    (``/plugins/curator/questions``, …) silently returned the SPA's HTML instead of JSON.
+    POSTs were unaffected, which is why applying a proposal worked but reading questions
+    didn't. Registering here, at the end of startup, is what keeps the two apart.
+    """
+    if any(getattr(r, "path", None) == "/{full_path:path}" for r in app.routes):
+        return
+    app.add_api_route("/{full_path:path}", spa_fallback, methods=["GET"],
+                      response_class=HTMLResponse, include_in_schema=False)

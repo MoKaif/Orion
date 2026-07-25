@@ -61,7 +61,24 @@ class WorldModel:
     def add_knowledge(self, entity_id: int, key: str, value: str, kind: str = "fact",
                       confidence: float = 1.0, status: str = "accepted",
                       source: str | None = None) -> int:
+        """Record a fact/observation/idea, **idempotently**.
+
+        Re-stating the same (entity, key, value) updates that row instead of appending a new
+        one. This used to append: the hourly vault index re-inserted every note's content each
+        run, so one note accumulated a row per hour — 94% of the table was duplicates, and
+        recall spent its slots on 30 copies of the same paragraph.
+        """
         with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM knowledge WHERE entity_id=? AND key=? AND value=?",
+                (entity_id, key, value),
+            ).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE knowledge SET kind=?, confidence=?, status=?, source=? WHERE id=?",
+                    (kind, confidence, status, source, row["id"]),
+                )
+                return row["id"]          # already embedded; nothing new to index
             cur = conn.execute(
                 """INSERT INTO knowledge (entity_id,key,value,kind,confidence,status,source)
                    VALUES (?,?,?,?,?,?,?)""",
@@ -142,23 +159,148 @@ class WorldModel:
     def resolve_review(self, review_id: int, action: str,
                        edited_payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """Accept / edit / reject a queued item. Accept/edit commits it to the world model."""
+        effect: dict[str, Any] | None = None
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM review_inbox WHERE id=?", (review_id,)).fetchone()
             if not row:
                 return {"error": "not found"}
             payload = edited_payload or json.loads(row["payload"])
-            if action in ("accept", "edit"):
-                if row["item_type"] == "knowledge":
-                    self._commit_knowledge(payload, status="accepted")
-                elif row["item_type"] == "relationship":
-                    self.add_relationship(payload["src_id"], payload["dst_id"], payload["type"],
-                                          payload.get("confidence", 1.0))
-                new_status = "accepted"
-            else:
-                new_status = "rejected"
+            item_type = row["item_type"]
+            new_status = "accepted" if action in ("accept", "edit") else "rejected"
             conn.execute("UPDATE review_inbox SET status=?, payload=? WHERE id=?",
                          (new_status, json.dumps(payload), review_id))
-        return {"outcome": new_status, "review_id": review_id}
+
+        # committed outside the first transaction: these helpers open their own connections
+        if new_status == "accepted":
+            if item_type == "knowledge":
+                self._commit_knowledge(payload, status="accepted")
+            elif item_type == "relationship":
+                self.add_relationship(payload["src_id"], payload["dst_id"], payload["type"],
+                                      payload.get("confidence", 1.0))
+            elif item_type == "duplicate":
+                # recomputed here rather than trusted from the client: the card showed a plan,
+                # accepting performs exactly that plan against the current state of the model.
+                effect = self.apply_duplicate_plan(payload)
+        out: dict[str, Any] = {"outcome": new_status, "review_id": review_id}
+        if effect is not None:
+            out["effect"] = effect
+        return out
+
+    # -- duplicates: say what will happen, then do exactly that ------------
+    #: Vault paths whose notes are deleted or machine-owned — a copy indexed from here is stale.
+    _STALE_DIRS = (".trash/", ".obsidian/")
+
+    def duplicate_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """What accepting a duplicate notice would do, in enough detail to render on the card.
+
+        Returns ``{action, effect, keep, drop[]}`` where action is:
+          * ``discard`` — exactly one live copy and one or more from `.trash`/`.obsidian`; the
+            stale copies go, the live note is untouched. (The common case: a note you deleted
+            in Obsidian was indexed before it was removed.)
+          * ``merge``   — several live copies; knowledge and relationships move onto the oldest
+            and the others are removed.
+          * ``gone``    — the entities no longer exist, so the notice is obsolete.
+        """
+        ids = [int(i) for i in payload.get("entity_ids", [])]
+        sides = [s for s in (self._duplicate_side(i) for i in ids) if s]
+        if len(sides) < 2:
+            return {"action": "gone", "keep": None, "drop": [],
+                    "effect": "These entities are already gone — accepting just clears the notice."}
+
+        stale = [s for s in sides if s["stale"]]
+        live = [s for s in sides if not s["stale"]]
+        if len(live) == 1 and stale:
+            n = sum(s["knowledge"] for s in stale)
+            where = live[0]["source"] or live[0]["name"]
+            return {
+                "action": "discard", "keep": live[0], "drop": stale,
+                "effect": (f"Deletes {len(stale)} stale cop{'y' if len(stale) == 1 else 'ies'} "
+                           f"indexed from your trash, and {n} knowledge row"
+                           f"{'' if n == 1 else 's'} that came with them. "
+                           f"{where} is left untouched."),
+            }
+        keep, *drop = sorted(sides, key=lambda s: (s["created_at"] or "", s["id"]))
+        moved = sum(s["knowledge"] for s in drop)
+        return {
+            "action": "merge", "keep": keep, "drop": drop,
+            "effect": (f"Moves {moved} knowledge row{'' if moved == 1 else 's'} onto "
+                       f"{keep['source'] or keep['name']} and removes the other "
+                       f"{len(drop)} cop{'y' if len(drop) == 1 else 'ies'}. Nothing is lost."),
+        }
+
+    def _duplicate_side(self, entity_id: int) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, type, name, canonical_key, source, created_at FROM entities WHERE id=?",
+                (entity_id,)).fetchone()
+            if not row:
+                return None
+            n = conn.execute("SELECT COUNT(*) c FROM knowledge WHERE entity_id=?",
+                             (entity_id,)).fetchone()["c"]
+        side = dict(row)
+        path = (side.get("source") or side.get("canonical_key") or "").lower()
+        side["knowledge"] = n
+        side["stale"] = any(d in path for d in self._STALE_DIRS)
+        return side
+
+    def apply_duplicate_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Execute the plan ``duplicate_plan`` describes. Returns what actually happened."""
+        plan = self.duplicate_plan(payload)
+        if plan["action"] == "gone":
+            return {"action": "gone", "removed": 0, "moved": 0}
+        keep_id = plan["keep"]["id"]
+        moved = removed = 0
+        for side in plan["drop"]:
+            if plan["action"] == "merge":
+                moved += self.merge_entities(keep_id, side["id"])
+            else:
+                self.discard_entity(side["id"])
+            removed += 1
+        self.add_event("duplicate_resolved",
+                       {"action": plan["action"], "keep": keep_id,
+                        "removed": [s["id"] for s in plan["drop"]], "moved": moved})
+        return {"action": plan["action"], "keep": keep_id, "removed": removed, "moved": moved}
+
+    def merge_entities(self, keep_id: int, drop_id: int) -> int:
+        """Move ``drop``'s knowledge and relationships onto ``keep``, then delete it.
+
+        Knowledge that would collide with a row ``keep`` already has is dropped rather than
+        duplicated (its vector goes too). Returns the number of knowledge rows carried over.
+        """
+        if keep_id == drop_id:
+            return 0
+        orphaned: list[str] = []
+        with self._connect() as conn:
+            rows = conn.execute("SELECT id, key, value FROM knowledge WHERE entity_id=?",
+                                (drop_id,)).fetchall()
+            moved = 0
+            for r in rows:
+                clash = conn.execute(
+                    "SELECT id FROM knowledge WHERE entity_id=? AND key=? AND value=?",
+                    (keep_id, r["key"], r["value"])).fetchone()
+                if clash:
+                    conn.execute("DELETE FROM knowledge WHERE id=?", (r["id"],))
+                    orphaned.append(f"k:{r['id']}")
+                else:
+                    conn.execute("UPDATE knowledge SET entity_id=? WHERE id=?", (keep_id, r["id"]))
+                    moved += 1
+            conn.execute("UPDATE relationships SET src_id=? WHERE src_id=?", (keep_id, drop_id))
+            conn.execute("UPDATE relationships SET dst_id=? WHERE dst_id=?", (keep_id, drop_id))
+            conn.execute("UPDATE events SET entity_id=? WHERE entity_id=?", (keep_id, drop_id))
+            conn.execute("DELETE FROM relationships WHERE src_id=dst_id")
+            conn.execute("DELETE FROM entities WHERE id=?", (drop_id,))
+        vectors.remove(orphaned + [f"e:{drop_id}"])
+        return moved
+
+    def discard_entity(self, entity_id: int) -> int:
+        """Delete an entity and everything hanging off it. Returns rows of knowledge removed."""
+        with self._connect() as conn:
+            kids = [f"k:{r['id']}" for r in conn.execute(
+                "SELECT id FROM knowledge WHERE entity_id=?", (entity_id,))]
+            conn.execute("DELETE FROM knowledge WHERE entity_id=?", (entity_id,))
+            conn.execute("DELETE FROM entities WHERE id=?", (entity_id,))
+        vectors.remove(kids + [f"e:{entity_id}"])
+        return len(kids)
 
     def _commit_knowledge(self, c: dict[str, Any], status: str) -> int:
         eid = self.upsert_entity(c.get("entity_type", "concept"), c["entity"],

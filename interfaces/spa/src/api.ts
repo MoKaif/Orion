@@ -1,16 +1,51 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ---- types -------------------------------------------------------------
+/** One button on an inbox card. The label names the outcome, not the mechanism. */
+export interface InboxAction {
+  label: string;
+  value: string;
+  tone: "accept" | "reject" | "neutral";
+  confirm?: string | null;
+}
+
+/** One side of a duplicate: which copy, from where, carrying how much. */
+export interface DuplicateSide {
+  id: number;
+  name: string;
+  type: string;
+  source: string | null;
+  canonical_key: string | null;
+  created_at: string | null;
+  knowledge: number;
+  stale: boolean;
+}
+
+export interface DuplicatePlan {
+  action: "discard" | "merge" | "gone";
+  effect: string;
+  keep: DuplicateSide | null;
+  drop: DuplicateSide[];
+}
+
 export interface InboxItem {
-  origin: "world_model" | "curator";
+  origin: "world_model" | "curator" | "curator_question";
   id: number;
   created_at: string;
   prov_agent: string;
   prov_label: string;
   prov_uri?: string | null;
+  /** What this is, in a sentence. */
+  title?: string;
+  /** What accepting will actually do — always shown before the buttons. */
+  effect?: string;
+  body?: string;
+  actions?: InboxAction[];
+  answerable?: boolean;
   // world_model
   item_type?: string;
   confidence?: number | null;
+  plan?: DuplicatePlan;
   payload?: {
     kind?: string;
     value?: string;
@@ -218,15 +253,20 @@ export const useWidgets = () =>
   useQuery({ queryKey: ["widgets"], queryFn: () => getJSON<Widget[]>("/api/widgets") });
 
 // ---- mutations ---------------------------------------------------------
-/** Resolve one inbox item (world-model review or Curator proposal) and refresh the queue. */
+/** Resolve one inbox item, whatever kind it is, and refresh the queue.
+ *
+ * `action` is the raw value from the card's own button (accept/reject/apply/yes/no/…), so a
+ * plugin can offer outcomes core has never heard of. */
 export function useResolveInbox() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { item: InboxItem; action: "accept" | "reject" }) => {
+    mutationFn: async (v: { item: InboxItem; action: string }) => {
       const { item, action } = v;
-      if (item.origin === "curator") {
-        // curator uses apply|reject
-        const a = action === "accept" ? "apply" : "reject";
+      if (item.origin === "curator_question") {
+        await postForm(`/plugins/curator/questions/${item.id}`, { answer: action });
+      } else if (item.origin === "curator") {
+        // curator proposals use apply|reject
+        const a = action === "accept" ? "apply" : action === "reject" ? "reject" : action;
         await postForm(`/plugins/curator/proposals/${item.id}`, { action: a });
       } else {
         await postForm(`/reviews/${item.id}`, { action });
@@ -235,6 +275,8 @@ export function useResolveInbox() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inbox"] });
       qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.invalidateQueries({ queryKey: ["agent", "curator"] });
+      qc.invalidateQueries({ queryKey: ["vitals"] });
     },
   });
 }

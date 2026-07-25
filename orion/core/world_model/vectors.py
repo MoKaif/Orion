@@ -99,6 +99,31 @@ class VectorIndex:
         except Exception as e:
             log.warning("vector add failed for %s: %s", ref, e)
 
+    def remove(self, refs: str | list[str], lane: str = "fastembed") -> int:
+        """Drop embeddings for refs whose rows are gone (merge / discard / dedupe).
+
+        Without this, a deleted knowledge row leaves its vector behind and recall keeps
+        spending one of its few slots resolving a ref to nothing.
+        """
+        if not self.is_available():
+            return 0
+        wanted = [refs] if isinstance(refs, str) else list(refs)
+        if not wanted:
+            return 0
+        try:
+            conn = self._connect()
+            removed = 0
+            for chunk in (wanted[i:i + 400] for i in range(0, len(wanted), 400)):
+                ph = ",".join("?" * len(chunk))
+                cur = conn.execute(f"DELETE FROM vec_{lane} WHERE ref IN ({ph})", tuple(chunk))
+                removed += cur.rowcount or 0
+            conn.commit()
+            conn.close()
+            return removed
+        except Exception as e:
+            log.warning("vector remove failed (%d ref(s)): %s", len(wanted), e)
+            return 0
+
     def search(self, query: str, k: int = 10, lane: str = "fastembed") -> list[dict[str, Any]]:
         if not self.is_available() or not query.strip():
             return []

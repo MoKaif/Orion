@@ -70,7 +70,16 @@ A plugin ships two things:
 | **Entity / relationship types** | `orion.add_entity_type(...)` / `add_relationship_type(...)`, or just declare them in the manifest | `/types`, graph legend, extract guidance |
 | **Background jobs** | `orion.add_job(name, cron, coro, agent=…)` | its agent's page, `/jobs`, retunable per job |
 | **Dashboard widgets** | `orion.add_widget(name, title, render)` | mission-control dashboard |
+| **Inbox items** | `orion.add_inbox_source(name, fetch)` | the unified inbox at `/inbox` |
 | **API routes** | export a module-level `router` (a FastAPI `APIRouter`) | mounted at `/plugins/<name>/…` |
+
+**Anything that waits on the user goes in the inbox.** A source returns normalized dicts, and
+every card must answer three things: what it is (`title`, plus `body`/`diff`), where it came
+from (`prov_agent`, `prov_label`, optional `prov_uri`), and — the one that matters —
+**`effect`: what accepting will actually do**, in the user's own words. Buttons come from
+`orion.inbox_action(label, value, tone, confirm=…)`; the label names the outcome ("Discard the
+stale copy"), never the mechanism ("accept"), and `confirm` asks for a second click on anything
+that deletes. Posting a card's action hits its `action_url` with the button's `value`.
 
 **Agents own jobs.** A job with no `agent=` belongs to the core **Conductor**; naming another
 plugin's agent (`agent="curator"`) is safe — if that plugin is disabled the job falls back to the

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from orion.core import agents, specialists, widgets
+from orion.core import agents, inbox, specialists, widgets
 from orion.core.scheduler import ScheduledJob, configured_cron, job_limit, scheduler
 from orion.core.tools import registry as _tools
 from orion.core.tools.base import BaseTool, ToolResult
@@ -34,8 +34,12 @@ from orion.core.world_model import types as _types
 __all__ = [
     "add_tool", "add_specialist", "add_agent", "add_job", "job_limit",
     "add_entity_type", "add_relationship_type", "add_widget",
+    "add_inbox_source", "inbox_action",
     "Specialist", "BaseTool", "ToolResult", "Widget",
 ]
+
+#: Build one button for an inbox card — see ``orion.core.inbox.action``.
+inbox_action = inbox.action
 
 Specialist = specialists.Specialist
 Widget = widgets.Widget
@@ -98,3 +102,13 @@ def add_relationship_type(name: str, description: str = "", color: str | None = 
 def add_widget(name: str, title: str, render: Callable[[], str], plugin: str = "core") -> None:
     """Register a server-rendered mission-control card (returns an HTML fragment string)."""
     widgets.register(widgets.Widget(name=name, title=title, render=render, plugin=plugin))
+
+
+def add_inbox_source(name: str, fetch: Callable[[], list[dict]], plugin: str = "core") -> None:
+    """Contribute items to the unified inbox.
+
+    ``fetch`` returns normalized dicts — see ``orion.core.inbox`` for the required fields. Each
+    item must carry an ``effect`` describing what accepting it does, and ``actions`` (built with
+    ``inbox_action``) naming each outcome in the user's own words.
+    """
+    inbox.register(inbox.InboxSource(name=name, fetch=fetch, plugin=plugin))

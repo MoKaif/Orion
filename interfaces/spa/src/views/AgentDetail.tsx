@@ -266,6 +266,9 @@ export default function AgentDetail() {
               <li key={q.id} className="q-item">
                 <span className="q-subject">{q.subject}</span>
                 <p className="q-text">{q.question}</p>
+                <Link to="/inbox" className="btn btn-sm">
+                  Answer in the inbox <ExternalLink size={12} />
+                </Link>
               </li>
             ))}
           </ul>

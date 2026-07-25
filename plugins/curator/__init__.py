@@ -66,6 +66,9 @@ def register() -> None:
 
     orion.add_widget("vault_curation", "Curator", _render_widget, plugin="curator")
 
+    # everything of the Curator's that waits on the user, in the one inbox
+    orion.add_inbox_source("curator", _inbox_items, plugin="curator")
+
 
 # -- what mission control shows for this agent -----------------------------
 def _summary() -> dict:
@@ -98,6 +101,80 @@ def _detail() -> dict:
         c.close()
     return {"proposals": engine.proposals(), "questions": questions,
             "entities": registry, "hub_threshold": ents._MENTION_THRESHOLD}
+
+
+# -- the Curator's share of the inbox --------------------------------------
+_EDIT_BLURB = {
+    "grammar": "a spelling and punctuation fix",
+    "backlink": "new [[wikilinks]] between your notes",
+    "entity_note": "a new hub note",
+}
+
+
+def _inbox_items() -> list[dict]:
+    """Note edits and open questions, each saying plainly what accepting will do."""
+    from . import engine, entities as ents, store
+
+    items: list[dict] = []
+    for p in engine.proposals():
+        path = p.get("path", "")
+        name = path.rsplit("/", 1)[-1].removesuffix(".md")
+        kind = p.get("kind", "grammar")
+        what = _EDIT_BLURB.get(kind, "a note edit")
+        effect = (f"Creates {path} in your vault." if kind == "entity_note"
+                  else f"Rewrites {path} with the changes below. The current version is backed "
+                       f"up to data/curator_backups/ first, and nothing else in the note moves.")
+        items.append({
+            "origin": "curator", "id": p["id"],
+            "title": f"Curator proposes {what}",
+            "kind": kind, "diff": p.get("diff", ""),
+            "effect": effect,
+            "created_at": p.get("created_at") or "",
+            "prov_agent": "Curator",
+            "prov_label": f"your note {name}",
+            "prov_uri": p.get("obsidian_uri"),
+            "action_url": f"/plugins/curator/proposals/{p['id']}",
+            "actions": [
+                orion.inbox_action("Create note" if kind == "entity_note" else "Apply the edit",
+                                   "apply", "accept"),
+                orion.inbox_action("Leave it alone", "reject", "reject"),
+            ],
+        })
+
+    c = store.conn()
+    try:
+        questions = ents.open_questions(c)
+    finally:
+        c.close()
+    for q in questions:
+        entity = q.get("entity") or {}
+        alias, ename = q.get("alias"), entity.get("name")
+        if q.get("kind") == "same_as" and alias and ename:
+            body = (f"While reading your notes the Curator treated “{alias}” as another way of "
+                    f"writing “{ename}”, and folded it in. It wasn't certain, so it's asking.")
+            effect = (f"Saying they're the same keeps “{alias}” as an alias of “{ename}” "
+                      f"({entity.get('mentions', 0)} mentions). Saying they're different pulls "
+                      f"“{alias}” back out into its own {entity.get('type', 'entity')}.")
+            actions = [
+                orion.inbox_action(f"Same as {ename}", "yes", "accept"),
+                orion.inbox_action("Different things", "no", "reject"),
+                orion.inbox_action("Skip", "__dismiss__"),
+            ]
+        else:
+            body = q.get("question", "")
+            effect = "Your answer is kept with the question; nothing in the vault changes."
+            actions = [orion.inbox_action("Skip", "__dismiss__")]
+        items.append({
+            "origin": "curator_question", "id": q["id"],
+            "title": q.get("question", "A question about your notes"),
+            "body": body, "effect": effect, "answerable": True,
+            "created_at": q.get("created_at") or "",
+            "prov_agent": "Curator",
+            "prov_label": f"the name “{q.get('subject', '')}”",
+            "action_url": f"/plugins/curator/questions/{q['id']}",
+            "actions": actions,
+        })
+    return items
 
 
 # -- plugin API (mounted at /plugins/curator) ------------------------------
@@ -143,11 +220,19 @@ async def list_questions():
 
 @router.post("/questions/{qid}")
 async def answer(qid: int, body: Answer):
+    """Answer a gap question. 'yes' confirms the merge, 'no' splits it back apart,
+    '__dismiss__' sets it aside without deciding."""
     from . import entities, store
     c = store.conn()
-    entities.answer_question(c, qid, body.answer)
-    c.close()
-    return {"ok": True}
+    try:
+        if body.answer.strip() in ("", "__dismiss__"):
+            c.execute("UPDATE questions SET status='dismissed', answered_at=? WHERE id=?",
+                      (store.now(), qid))
+            c.commit()
+            return {"ok": True, "outcome": "dismissed"}
+        return entities.answer_question(c, qid, body.answer)
+    finally:
+        c.close()
 
 
 @router.post("/scan")

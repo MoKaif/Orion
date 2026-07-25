@@ -10,6 +10,7 @@ place without losing a row.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
@@ -56,6 +57,11 @@ _MIGRATIONS = [
     ("notes", "mined_sha", "TEXT"),     # memory-extraction checkpoint
     ("notes", "linked_sha", "TEXT"),    # backlink-pass checkpoint
     ("notes", "entity_sha", "TEXT"),    # entity-registry pass checkpoint
+    # A question used to be prose only, so answering it could do nothing but store the text.
+    # These record what it is *about*, which is what makes an answer actionable.
+    ("questions", "kind", "TEXT NOT NULL DEFAULT 'same_as'"),   # same_as | open
+    ("questions", "entity_id", "INTEGER"),  # the registry row the alias was folded into
+    ("questions", "alias", "TEXT"),         # the surface form in doubt ("metro")
 ]
 
 
@@ -72,11 +78,40 @@ def conn() -> sqlite3.Connection:
     return c
 
 
+#: Questions are generated from one template, so an old row's own text is enough to recover
+#: what it was about. Matches: Is "metro" the same as "metro station"?
+_SAME_AS_RE = re.compile(r'^Is "(?P<alias>.+)" the same as "(?P<target>.+)"\?$')
+
+
 def _migrate(c: sqlite3.Connection) -> None:
     for table, col, decl in _MIGRATIONS:
         cols = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
         if col not in cols:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    c.commit()
+    _backfill_questions(c)
+
+
+def _backfill_questions(c: sqlite3.Connection) -> None:
+    """Recover `alias` + `entity_id` for questions asked before those columns existed.
+
+    Without this an existing question stays un-actionable forever: the UI can only offer
+    "skip", because nothing records which entity absorbed which alias. Keyed off the rows
+    themselves rather than the schema change, so it also heals a db migrated by an earlier
+    build that added the columns without filling them.
+    """
+    todo = c.execute("SELECT id, question FROM questions "
+                     "WHERE entity_id IS NULL AND status='open'").fetchall()
+    for row in todo:
+        m = _SAME_AS_RE.match(row["question"] or "")
+        if not m:
+            continue
+        target = c.execute("SELECT id FROM entities WHERE lower(name)=lower(?)",
+                           (m.group("target"),)).fetchone()
+        if target is None:
+            continue
+        c.execute("UPDATE questions SET kind='same_as', alias=?, entity_id=? WHERE id=?",
+                  (m.group("alias"), target["id"], row["id"]))
     c.commit()
 
 

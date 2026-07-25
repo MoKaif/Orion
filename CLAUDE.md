@@ -145,6 +145,33 @@ routers, and warns on declared-vs-registered drift (including declared `agents`)
 batched job. New endpoints: `/plugins` (contributions) · `/types` (world-model vocabulary). The
 `knowledge` plugin is the reference implementation (rides entirely on the SDK).
 
+## The inbox — one queue, and every card states its consequence
+
+`orion/core/inbox.py` is a registry of **sources**; core contributes the world-model review
+queue and plugins add their own via `plugin_sdk.add_inbox_source` (core no longer imports
+Curator to build the inbox). Every card carries `title` · `effect` · `actions`, where **`effect`
+says what accepting does** and each action's label names the outcome, not the mechanism
+(`inbox_action(label, value, tone, confirm=…)`; `confirm` forces a second click on destructive
+ones). This existed because a `duplicate` notice used to render as "record this observation
+about undefined" and accepting it did **nothing at all** — `resolve_review` only ever committed
+`knowledge`/`relationship`.
+
+- **Duplicates are now real work.** `world_model.duplicate_plan(payload)` returns
+  `{action, effect, keep, drop[]}` — `discard` when one side came from `.trash`/`.obsidian`,
+  `merge` when both are live, `gone` when the entities are already deleted. Accept recomputes
+  the plan server-side and runs it via `apply_duplicate_plan` → `merge_entities` /
+  `discard_entity` (both clean up embeddings through the new `vectors.remove`).
+- **Curator questions are answerable.** The `questions` table gained `kind`/`entity_id`/`alias`,
+  so "no" actually splits an optimistically-merged alias back out (`entities._split_alias`) and
+  "yes" confirms it; older rows are healed by a backfill that parses the question text.
+- **Ingestion no longer manufactures duplicates**: `add_knowledge` upserts on
+  (entity, key, value) — it used to append, so the hourly index gave every note a row per hour
+  (94% of the table) — and `settings.vault.ignore` keeps `.trash`/`.obsidian` out. One-off
+  cleanup: `python scripts/dedupe_knowledge.py [--apply]` (backs the db up first).
+- **Route order matters**: the SPA catch-all is registered by `_register_spa_fallback()` at the
+  *end* of startup. Registered at import time it shadowed every plugin GET route, which is why
+  `/plugins/curator/questions` returned HTML while POSTs worked.
+
 ## Agents (revamped) — the unit the user sees
 
 An **agent** is a named worker that owns background jobs and gets a card on `/agents` plus its own

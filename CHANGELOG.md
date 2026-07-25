@@ -10,6 +10,27 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.8.0] — 2026-07-26
+
+The inbox says what accepting will do
+
+### Added
+- orion/core/inbox.py — a source registry for the unified inbox; plugins contribute items via plugin_sdk.add_inbox_source instead of core importing Curator
+- Every card now carries title / effect / actions: effect states the consequence in the user's words, and each button names its outcome ("Discard the stale copy") rather than a mechanism
+- world_model.duplicate_plan() decides between discard (one copy came from .trash) / merge (both live) / gone (already deleted), shows both sides with their paths and fact counts, and accept recomputes and runs exactly that plan
+- merge_entities / discard_entity, plus vectors.remove() so deleted rows stop occupying recall slots
+- Curator questions are answerable from the inbox: 'no' splits an optimistically-merged alias back out into its own entity, 'yes' confirms it; questions carry kind/entity_id/alias, and older rows are healed by a backfill that parses the question text
+- scripts/dedupe_knowledge.py — reports by default, --apply backs the db up then collapses duplicates and drops .trash entities
+
+### Changed
+- settings.vault.ignore keeps .trash/.obsidian out of vault ingestion, so deleted notes stop reappearing as duplicate entities
+
+### Fixed
+- Accepting a duplicate notice did nothing at all — resolve_review only committed knowledge/relationship items, so the card was unreadable and the action was a no-op
+- add_knowledge appended instead of upserting on (entity, key, value): the hourly vault index gave every note a fresh copy of its content each run, leaving 94% of the knowledge table duplicated and crowding recall
+- Answering a Curator question only stored the text; nothing acted on it
+- The SPA catch-all route was registered at import time and shadowed every plugin GET route, so /plugins/curator/questions returned HTML instead of JSON; it is now registered after plugins mount
+
 ## [0.7.0] — 2026-07-25
 
 Agents are first-class: cards, per-agent pages, tunable passes
