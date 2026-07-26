@@ -10,6 +10,16 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.8.1] — 2026-07-26
+
+Curator passes stop colliding with themselves and the db
+
+### Fixed
+- database is locked: both SQLite files now run in WAL with a 30s busy_timeout, and only one Curator pass runs at a time (the gate only fenced background work off from chat, not from other jobs)
+- UNIQUE constraint failed: entities.canonical — a name made only of honorifics ('Bhaiya') normalized to an empty key, so the second one could never be inserted; those mentions are now dropped, inserts are ON CONFLICT-safe, and a migration heals existing blank keys
+- backfill reports each pass's outcome instead of aborting the remaining three when one fails
+- dedupe_knowledge backs up via sqlite's backup API — a file copy loses commits still in the -wal sidecar
+
 ## [0.8.0] — 2026-07-26
 
 The inbox says what accepting will do

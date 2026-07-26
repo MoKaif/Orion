@@ -65,16 +65,39 @@ _MIGRATIONS = [
 ]
 
 
+#: How long a writer waits for the lock before giving up. A pass can hold the db for a
+#: moment at a time while another is mid-run; five seconds (sqlite3's default) is not enough.
+_BUSY_TIMEOUT_MS = 30_000
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+#: Schema + migration are process-wide work, not per-connection work. Every dashboard poll
+#: opens a connection, and running DDL on each one is both wasted effort and a needless
+#: writer on a file the passes are trying to write.
+_READY = False
+
+
 def conn() -> sqlite3.Connection:
+    """A connection tuned for the way Curator actually runs: several passes writing at once.
+
+    WAL lets the UI read while a pass writes, and a long ``busy_timeout`` makes a second
+    writer *wait* for the first instead of raising "database is locked" after the stock
+    five seconds — which is what took whole passes down.
+    """
+    global _READY
     _DB.parent.mkdir(parents=True, exist_ok=True)
-    c = sqlite3.connect(_DB)
+    c = sqlite3.connect(_DB, timeout=_BUSY_TIMEOUT_MS / 1000)
     c.row_factory = sqlite3.Row
-    c.executescript(_SCHEMA)
-    _migrate(c)
+    c.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+    c.execute("PRAGMA journal_mode = WAL")
+    c.execute("PRAGMA synchronous = NORMAL")
+    if not _READY:
+        c.executescript(_SCHEMA)
+        _migrate(c)
+        _READY = True
     return c
 
 
@@ -90,6 +113,24 @@ def _migrate(c: sqlite3.Connection) -> None:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
     c.commit()
     _backfill_questions(c)
+    _heal_blank_canonicals(c)
+
+
+def _heal_blank_canonicals(c: sqlite3.Connection) -> None:
+    """Give a real key to rows whose canonical came out empty.
+
+    A name made of nothing but honorifics ("Bhaiya", "Sir") normalized to "" and was stored
+    under that key. Because ``canonical`` is UNIQUE, the *next* such mention could never be
+    inserted — it raised ``UNIQUE constraint failed`` and took the whole pass down with it.
+    The registry pass no longer creates these; this repairs the ones already on disk.
+    """
+    for row in c.execute("SELECT id, name FROM entities WHERE TRIM(canonical) = ''").fetchall():
+        key = re.sub(r"\s+", " ", (row["name"] or "").lower()).strip() or f"entity-{row['id']}"
+        taken = c.execute("SELECT id FROM entities WHERE canonical=?", (key,)).fetchone()
+        if taken:
+            key = f"{key}-{row['id']}"
+        c.execute("UPDATE entities SET canonical=? WHERE id=?", (key, row["id"]))
+    c.commit()
 
 
 def _backfill_questions(c: sqlite3.Connection) -> None:

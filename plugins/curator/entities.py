@@ -67,7 +67,9 @@ async def mine_note(text: str) -> list[dict[str, str]]:
     for it in items:
         if isinstance(it, dict) and it.get("name") and it.get("type") in _TYPE_DIR:
             name = _LEAD_NOISE.sub("", str(it["name"]).strip()).strip()
-            if len(name) >= 2:
+            # a name that is nothing but honorifics ("Bhaiya", "Sir") normalizes to an empty
+            # key — it names no one, so it never becomes a registry row.
+            if len(name) >= 2 and canonical(name):
                 out.append({"name": name, "type": it["type"]})
     return out
 
@@ -108,10 +110,33 @@ def resolve(c, mention: dict[str, str],
     return None, 0.0
 
 
-def register_mention(c, mention: dict[str, str], embed_cache: dict[str, list[float]]) -> int:
-    """Record one mention, merging into an existing entity or creating a pending one."""
-    eid, score = resolve(c, mention, embed_cache)
+def _create(c, canon: str, name: str, type: str, aliases: list[str]) -> int:
+    """Insert a new registry row, or fold into whichever row already owns this key.
+
+    ``ON CONFLICT`` matters because two passes can reach the same unseen name at the same
+    time (backfill runs the registry pass too). A lost race should be a merge, not a
+    ``UNIQUE constraint failed`` that takes the whole run down.
+    """
+    ts = store.now()
+    c.execute(
+        "INSERT INTO entities (canonical, name, type, aliases, mentions, status, "
+        "created_at, updated_at) VALUES (?,?,?,?,1,'pending',?,?) "
+        "ON CONFLICT(canonical) DO UPDATE SET mentions=mentions+1, updated_at=excluded.updated_at",
+        (canon, name, type, json.dumps(aliases), ts, ts))
+    c.commit()
+    return c.execute("SELECT id FROM entities WHERE canonical=?", (canon,)).fetchone()["id"]
+
+
+def register_mention(c, mention: dict[str, str],
+                     embed_cache: dict[str, list[float]]) -> int | None:
+    """Record one mention, merging into an existing entity or creating a pending one.
+
+    Returns the registry id, or None for a mention that names no one.
+    """
     canon = canonical(mention["name"])
+    if not canon:               # honorifics only ("Bhaiya") — not an entity
+        return None
+    eid, score = resolve(c, mention, embed_cache)
     if eid is not None:
         row = c.execute("SELECT * FROM entities WHERE id=?", (eid,)).fetchone()
         aliases = set(json.loads(row["aliases"])) | {mention["name"]}
@@ -126,13 +151,7 @@ def register_mention(c, mention: dict[str, str], embed_cache: dict[str, list[flo
                 f'Is "{mention["name"]}" the same as "{row["name"]}"?',
                 kind="same_as", entity_id=eid, alias=mention["name"])
         return eid
-    cur = c.execute(
-        "INSERT INTO entities (canonical, name, type, aliases, mentions, status, "
-        "created_at, updated_at) VALUES (?,?,?,?,1,'pending',?,?)",
-        (canon, display(mention["name"]), mention["type"],
-         json.dumps([mention["name"]]), store.now(), store.now()))
-    c.commit()
-    return cur.lastrowid
+    return _create(c, canon, display(mention["name"]), mention["type"], [mention["name"]])
 
 
 # -- hub-note authoring ----------------------------------------------------
@@ -249,10 +268,7 @@ def _split_alias(c, entity_id: int, alias: str, subject: str) -> str:
     c.execute("UPDATE entities SET aliases=?, mentions=MAX(mentions-1, 0), updated_at=? WHERE id=?",
               (json.dumps(sorted(aliases)), store.now(), entity_id))
     canon = canonical(alias)
-    existing = c.execute("SELECT id FROM entities WHERE canonical=?", (canon,)).fetchone()
-    if existing is None:
-        c.execute("INSERT INTO entities (canonical, name, type, aliases, mentions, status, "
-                  "created_at, updated_at) VALUES (?,?,?,?,1,'pending',?,?)",
-                  (canon, display(subject or alias), row["type"], json.dumps([alias]),
-                   store.now(), store.now()))
+    if not canon:
+        return "split"          # the alias names no one on its own; nothing to split out to
+    _create(c, canon, display(subject or alias), row["type"], [alias])
     return "split"

@@ -19,7 +19,6 @@ The backup is a plain file copy next to the db; restore by moving it back.
 from __future__ import annotations
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from datetime import datetime
@@ -92,8 +91,11 @@ def main() -> int:
         conn.close()
         return 0
 
+    # sqlite's own backup API rather than a file copy: the db runs in WAL mode, where recent
+    # commits can still live in the -wal sidecar and a plain copy would silently lose them.
     backup = db.with_name(f"{db.stem}.backup-{datetime.now():%Y%m%d-%H%M%S}{db.suffix}")
-    shutil.copy2(db, backup)
+    with sqlite3.connect(backup) as dest:
+        conn.backup(dest)
     print(f"\nbacked up to    {backup.name}")
 
     # entity removal first, so its knowledge doesn't get counted twice

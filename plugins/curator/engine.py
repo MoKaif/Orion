@@ -17,10 +17,11 @@ existing backlog gets worked down over a few idle nights instead of one expensiv
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Iterator
 
 from orion.core.config import config
 
@@ -29,6 +30,12 @@ from . import backlinks, entities, grammar, memory, notes, store
 log = logging.getLogger("orion.curator")
 
 _BACKUPS = config.root() / "data" / "curator_backups"
+
+#: One pass at a time. The scheduler's gate only holds background work back from *chat* — two
+#: Curator jobs (a cron pass and a hand-started one, or ``backfill``, which runs every pass
+#: itself) will happily run at once, and then they fight over curator.db and the one local
+#: model. Queueing them is both safer and, on a CPU-only box, no slower.
+_pass_lock = asyncio.Lock()
 
 # re-exports so callers keep importing these from engine
 obsidian_uri = notes.obsidian_uri
@@ -71,6 +78,11 @@ def _todo(c, column: str, limit: int, editable_only: bool = True,
 # -- pass 1: grammar -------------------------------------------------------
 async def scan(limit: int = 5) -> dict[str, Any]:
     """Grammar/spelling pass (the original nightly job). Kept name + return shape for compat."""
+    async with _pass_lock:
+        return await _scan(limit)
+
+
+async def _scan(limit: int) -> dict[str, Any]:
     if not await _local_ready():
         return {"ok": False, "reason": "local model (Ollama) unreachable — Curator is local-only"}
     c = store.conn()
@@ -91,6 +103,11 @@ async def scan(limit: int = 5) -> dict[str, Any]:
 # -- pass 2: entity registry ----------------------------------------------
 async def build_registry(limit: int = 5) -> dict[str, Any]:
     """Mine entity mentions from notes into the resident registry, then propose hub notes."""
+    async with _pass_lock:
+        return await _build_registry(limit)
+
+
+async def _build_registry(limit: int) -> dict[str, Any]:
     if not await _local_ready():
         return {"ok": False, "reason": "local model unreachable"}
     c = store.conn()
@@ -99,8 +116,8 @@ async def build_registry(limit: int = 5) -> dict[str, Any]:
     for _path, rel, text, h in _todo(c, "entity_sha", limit, block_kinds=[]):
         checked += 1
         for mention in await entities.mine_note(text):
-            entities.register_mention(c, mention, embed_cache)
-            mentions += 1
+            if entities.register_mention(c, mention, embed_cache) is not None:
+                mentions += 1
         store.mark_note(c, rel, entity_sha=h)
     hubs = _propose_hub_notes(c)
     total = c.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
@@ -137,6 +154,11 @@ def _propose_hub_notes(c) -> int:
 
 # -- pass 3: backlinks (graph view) ---------------------------------------
 async def weave_backlinks(limit: int = 5) -> dict[str, Any]:
+    async with _pass_lock:
+        return await _weave_backlinks(limit)
+
+
+async def _weave_backlinks(limit: int) -> dict[str, Any]:
     c = store.conn()
     registry = backlinks.linkable_registry(c)
     if not registry:
@@ -160,6 +182,11 @@ async def weave_backlinks(limit: int = 5) -> dict[str, Any]:
 
 # -- pass 4: memory --------------------------------------------------------
 async def grow_memory(limit: int = 5) -> dict[str, Any]:
+    async with _pass_lock:
+        return await _grow_memory(limit)
+
+
+async def _grow_memory(limit: int) -> dict[str, Any]:
     if not await _local_ready():
         return {"ok": False, "reason": "local model unreachable"}
     c = store.conn()
@@ -177,13 +204,22 @@ async def grow_memory(limit: int = 5) -> dict[str, Any]:
 
 # -- backfill: bounded catch-up across every pass --------------------------
 async def backfill(per_pass: int = 8) -> dict[str, Any]:
-    """One bounded slice of each pass — run nightly to work the backlog down over time."""
-    return {
-        "grammar": await scan(per_pass),
-        "registry": await build_registry(per_pass),
-        "memory": await grow_memory(per_pass),
-        "backlinks": await weave_backlinks(per_pass),
-    }
+    """One bounded slice of each pass — run nightly to work the backlog down over time.
+
+    Takes the lock once for the lot, and reports each pass's outcome even when one of them
+    fails: a bad note in the registry pass used to abort the memory and backlink passes too.
+    """
+    passes = (("grammar", _scan), ("registry", _build_registry),
+              ("memory", _grow_memory), ("backlinks", _weave_backlinks))
+    out: dict[str, Any] = {}
+    async with _pass_lock:
+        for name, fn in passes:
+            try:
+                out[name] = await fn(per_pass)
+            except Exception as e:
+                log.warning("curator backfill: %s pass failed: %s", name, e)
+                out[name] = {"ok": False, "error": str(e)}
+    return out
 
 
 async def _local_ready() -> bool:

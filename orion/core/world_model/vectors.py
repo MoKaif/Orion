@@ -24,6 +24,10 @@ log = logging.getLogger("orion.vectors")
 # fastembed: knowledge; tools: tool descriptions (kept separate so tool vectors never pollute
 # knowledge recall); custom: reserved for a user-configured embedding endpoint.
 LANES = ("fastembed", "tools", "custom")
+#: How long a writer waits for the lock before giving up, in ms. Background jobs (vault
+#: indexing, the Curator's passes, consolidation) write the same file as an interactive turn;
+#: sqlite3's five-second default turned any overlap into "database is locked".
+BUSY_TIMEOUT_MS = 30_000
 
 
 class VectorIndex:
@@ -72,7 +76,10 @@ class VectorIndex:
 
     def _connect(self) -> sqlite3.Connection:
         import sqlite_vec
-        conn = sqlite3.connect(self._path)
+        conn = sqlite3.connect(self._path, timeout=BUSY_TIMEOUT_MS / 1000)
+        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)

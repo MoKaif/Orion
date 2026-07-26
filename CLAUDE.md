@@ -206,7 +206,18 @@ There is no hardcoded job→agent map in core any more — a third agent is one 
 local fallback). Nothing touches a note until the user applies a proposal — staleness check
 (sha) + timestamped backup to `data/curator_backups/` first. Own store: `data/curator.db`.
 API: `GET/POST /plugins/curator/proposals[/{id}]`, `POST /plugins/curator/scan`; dashboard
-widget `vault_curation`. Roadmap: v2 backlinking, v3 gap-finding questions, v4 drafting
+widget `vault_curation`.
+
+**Both SQLite files run in WAL with a 30 s `busy_timeout`** (`store.conn()`,
+`world_model.store._connect`, `vectors._connect`). The gate only holds background work back from
+*chat*, not from other jobs, so passes did overlap and the stock 5 s/rollback-journal setup
+turned that into `database is locked`. On top of that, `engine._pass_lock` runs **one Curator pass
+at a time** (backfill takes it once for all four and reports per-pass failures instead of dying on
+the first). Anything that copies a db must use `conn.backup()`, not a file copy — a plain copy
+loses commits still in the `-wal` sidecar. Registry keys: a name that is only honorifics
+("Bhaiya") normalizes to `""`, which used to be inserted and then collide forever on
+`entities.canonical UNIQUE` — such mentions are now dropped, inserts are `ON CONFLICT`-safe, and
+a migration heals existing blank keys. Roadmap: v2 backlinking, v3 gap-finding questions, v4 drafting
 entity/place notes. (The old standalone Windows-era `Curator/` dir at repo root is legacy.)
 
 ## Next: expansion (each is one plugin / one interface, no core work)

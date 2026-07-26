@@ -13,7 +13,7 @@ from typing import Any
 
 from orion.core.config import config
 from .schema import SCHEMA
-from .vectors import vectors
+from .vectors import BUSY_TIMEOUT_MS, vectors
 
 
 class WorldModel:
@@ -26,9 +26,12 @@ class WorldModel:
         vectors.bind(self._path)
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._path)
+        conn = sqlite3.connect(self._path, timeout=BUSY_TIMEOUT_MS / 1000)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
     def _init_schema(self) -> None:
