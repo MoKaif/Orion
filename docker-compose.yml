@@ -12,12 +12,20 @@ services:
     restart: unless-stopped          # survives reboots; a NoxCtl "stop" (compose down) stays down
     network_mode: host
     volumes:
-      - ./data:/app/data             # SQLite world model + usage.json
+      - ./data:/app/data             # SQLite world model + usage.json + herald.db (the outbox)
       - ./data/models:/tmp/fastembed_cache  # fastembed ONNX model — downloaded once, reused
-      - ./config:/app/config         # settings/models/jobs + gitignored secrets.json (Claude key)
+      # settings/models/jobs/herald + gitignored secrets.json, which is where the cloud keys
+      # and Herald's Gmail app password live. Never baked into a layer (see .dockerignore).
+      - ./config:/app/config
       # Obsidian vault, mounted at the same path as on the host so settings.json's
       # vault.path works both bare-metal and in-container. Read-write: Curator applies
       # user-approved grammar fixes here (backups land in ./data/curator_backups).
       - /home/nox/Nox:/home/nox/Nox
     environment:
       - PYTHONUNBUFFERED=1
+      # Left unset on purpose: Orion applies settings.json's identity.timezone at startup, so
+      # the clock has one source of truth for both bare-metal and container. Set TZ here only
+      # to deliberately override that (it wins).
+      #
+      # Outbound SMTP (Herald -> smtp.gmail.com:465) works without extra config because this
+      # is host networking; there is no bridge to punch through.

@@ -10,6 +10,17 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.10.1] — 2026-08-01
+
+Background jobs run on your clock, not the container's
+
+### Changed
+- The image installs tzdata so zone names resolve, and compose deliberately leaves TZ unset so settings.json stays the single source of truth for both bare-metal and container.
+- docker-compose notes that data/ now carries Herald's outbox and config/ carries its Gmail app password, and that outbound SMTP needs no extra config under host networking.
+
+### Fixed
+- Every cron time and quiet-hours window is wall-clock, but the Docker image is UTC and the scheduler compares against a naive datetime.now() — so the 07:30 briefing fired at 13:00 IST and Herald's 22:00-07:00 quiet hours covered 03:30-12:30, suppressing the very slot the briefing was meant to use. config.apply_timezone() now runs first thing at startup and makes settings.json's identity.timezone authoritative; an explicit TZ still wins.
+
 ## [0.10.0] — 2026-08-01
 
 Herald sounds like a correspondent, not an echo of yourself

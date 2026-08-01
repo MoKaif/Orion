@@ -60,6 +60,17 @@ missing key, or billing/availability failure **falls back to local** rather than
 `ANTHROPIC_API_KEY` loads from gitignored `config/secrets.json` (also mirrored to
 `~/.config/anthropic/credentials.env` for reuse across projects) — never from tracked config.
 
+## The clock — cron times are wall-clock, and the container is not
+
+`config.apply_timezone()` runs first thing in the app lifespan and sets the process timezone from
+`settings.json > identity.timezone` (an explicit `TZ` env var wins, so a deployment can still
+override). Nothing had ever read that setting. It matters because `scheduler` compares cron
+expressions against a naive `datetime.now()`: bare metal that is the user's local time, but the
+Docker image is **UTC**, so a `30 7 * * *` briefing fired at **13:00 IST** and Herald's
+`quiet_hours` `[22, 7]` covered 03:30–12:30 IST — suppressing the very slot the morning briefing
+was meant to use. The image installs `tzdata` so zone names resolve; compose deliberately leaves
+`TZ` unset so settings.json stays the single source of truth.
+
 ## On-host bring-up (Arch)
 
 ```bash

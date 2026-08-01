@@ -31,7 +31,12 @@ _SPA_DIST = Path(__file__).resolve().parents[3] / "interfaces" / "spa" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("Orion %s starting for user=%s", __version__, identity.user())
+    # Before anything schedules: cron times and quiet hours are wall-clock, and a container
+    # is UTC unless told otherwise.
+    from datetime import datetime as _dt
+    tz = config.apply_timezone()
+    log.info("Orion %s starting for user=%s | clock=%s (%s)", __version__, identity.user(),
+             tz or "system default", _dt.now().strftime("%Y-%m-%d %H:%M %Z"))
     from orion.core.tools.builtin import register_builtins
     from orion.core.tools import selection
     from orion.core import maintenance

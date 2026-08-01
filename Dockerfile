@@ -19,7 +19,11 @@ RUN pnpm build
 FROM python:3.13-slim-bookworm
 
 # libgomp1: OpenMP runtime onnxruntime needs. curl: the container HEALTHCHECK.
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl \
+# tzdata: the image is UTC, but every cron time and quiet-hours window in Orion is
+# wall-clock — without a tz database a 07:30 briefing fires at 13:00 IST. The zone itself
+# comes from settings.json (identity.timezone), applied at startup; this just makes the
+# names resolvable.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

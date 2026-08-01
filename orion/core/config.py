@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +74,31 @@ class Config:
 
     def root(self) -> Path:
         return _ROOT
+
+    # -- clock -------------------------------------------------------------
+    def apply_timezone(self) -> str | None:
+        """Run the process on the user's own clock, from ``identity.timezone``.
+
+        Cron schedules and quiet hours are wall-clock ideas — "the small hours", "07:30" — and
+        the scheduler compares them against a naive ``datetime.now()``. Bare metal that reads
+        as the user's local time, but a container is UTC unless told otherwise, which silently
+        moved a 07:30 briefing to 13:00 IST and slid quiet hours over the very slot it was
+        meant to use. Nothing had ever read ``identity.timezone``; this makes it authoritative.
+
+        An explicit ``TZ`` in the environment always wins, so a deployment can still override.
+        """
+        if os.environ.get("TZ"):
+            return os.environ["TZ"]
+        tz = self.section("settings").get("identity", {}).get("timezone")
+        if not tz:
+            return None
+        os.environ["TZ"] = str(tz)
+        try:
+            time.tzset()                      # Unix only; the target host and image are Linux
+        except AttributeError:
+            log.warning("cannot set process timezone on this platform; jobs run on local time")
+            return None
+        return str(tz)
 
     # -- writes ------------------------------------------------------------
     def update(self, name: str, patch: dict[str, Any]) -> dict[str, Any]:
