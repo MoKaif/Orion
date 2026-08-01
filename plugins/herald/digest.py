@@ -266,14 +266,27 @@ async def morning_briefing() -> dict:
     return {**result, "waiting": len(items), "failures": len(failures)}
 
 
+def subject(tail: str, *, dated: bool = True) -> str:
+    """``Orion · Herald — <what happened> · <date>``.
+
+    The prefix is fixed so the mail is identifiable at a glance and filterable in one rule; the
+    tail is the only part that changes, so the subject still answers "do I need to open this?"
+    without being opened. The date stays on the end for a practical reason: Gmail threads
+    messages that share a subject, and a briefing that says the same thing two mornings running
+    would otherwise collapse into yesterday's conversation.
+    """
+    prefix = mailer.settings().get("subject_prefix", "Orion · Herald")
+    stamp = f" · {datetime.now():%a %d %b}" if dated else ""
+    return f"{prefix} — {tail}{stamp}"
+
+
 def _briefing_subject(waiting: int, failures: int) -> str:
     """A subject line that is readable without opening the mail."""
-    stamp = datetime.now().strftime("%a %d %b")
     if failures:
-        return f"Orion · {stamp} · {failures} job{'s' if failures != 1 else ''} failed overnight"
+        return subject(f"{failures} job{'s' if failures != 1 else ''} failed overnight")
     if waiting:
-        return f"Orion · {stamp} · {waiting} waiting for you"
-    return f"Orion · {stamp} · all clear"
+        return subject(f"{waiting} waiting for you")
+    return subject("all clear")
 
 
 async def weekly_letter() -> dict:
@@ -332,7 +345,7 @@ async def weekly_letter() -> dict:
         "footer": _FOOTER,
     }
     result = await mailer.deliver(
-        "weekly", f"Orion · week to {datetime.now():%d %b} · {_money(spend['cost_usd'])} spent",
+        "weekly", subject(f"the week in review · {_money(spend['cost_usd'])} spent"),
         render.html(letter), render.text(letter))
     return {**result, "runs": len(runs), "spend_usd": spend["cost_usd"]}
 
@@ -398,7 +411,7 @@ async def watch_alerts() -> dict:
             "footer": _FOOTER,
         }
         result = await mailer.deliver(
-            "alert", f"Orion alert · {fired[0]['heading']}", render.html(letter),
+            "alert", subject(f"alert: {fired[0]['heading'].lower()}"), render.html(letter),
             render.text(letter))
         if result.get("outcome") == "sent":
             for f in fired:
@@ -442,7 +455,7 @@ async def nudge_inbox() -> dict:
         "footer": _FOOTER,
     }
     result = await mailer.deliver(
-        "nudge", f"Orion · {len(stale)} items still waiting on you",
+        "nudge", subject(f"{len(stale)} items still waiting on you"),
         render.html(letter), render.text(letter))
     if result.get("outcome") == "sent":
         c = store.conn()

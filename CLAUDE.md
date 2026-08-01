@@ -226,6 +226,23 @@ never a drip). Own store: `data/herald.db` (WAL + 30 s busy_timeout like the Cur
 - Credentials: `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` from gitignored `config/secrets.json`
   only. No key ⇒ `mailer.status()` explains itself, jobs no-op, the agent page shows a banner.
   Tuning lives in tracked `config/herald.json` (+ `herald.local.json` overlay).
+- **Sender ≠ owner.** `owner_address()` is the user's mailbox; `sender_address()` is what
+  Herald authenticates as, and optional `GMAIL_SENDER_ADDRESS`/`GMAIL_SENDER_APP_PASSWORD`
+  point it at a second free Google account. This matters because when the two are the same,
+  Gmail files every briefing as mail the user sent themselves (own avatar, "me" as sender, no
+  importance signal) — and **no header can fix it**, since Gmail's SMTP rewrites a `From` that
+  isn't the authenticated account. `is_self` is keyed to the *owner*, so mail addressed to
+  Herald's own sending account is still held: "who it comes from" and "who it may go to
+  unattended" are different questions and only the second is a safety gate.
+- Subjects are built in one place (`digest.subject`): `Orion · Herald — <what happened> ·
+  <date>`. Fixed prefix so it is recognisable and filterable in one Gmail rule; the tail says
+  whether it needs opening; the date stops Gmail threading two identical mornings together.
+- Priority headers (`X-Priority`/`Importance`/`Priority`) on `high_priority` kinds — alerts and
+  nudges by default. Desktop clients honour these; **Gmail's importance markers are learned
+  per-user and cannot be asserted by a sender**, so a filter is the only reliable route.
+  `Auto-Submitted: auto-generated` was removed: it only suppressed vacation auto-responders
+  (meaningless for self-mail) while marking the message machine-generated, which is the exact
+  signal that argues against the importance we want.
 - API: `/plugins/herald/status` · `/outbox[/{id}]` · `POST /outbox/{id}` (send|cancel) ·
   `POST /preview` (renders a letter free, no prose call) · `POST /test` · `POST /send/{kind}`.
   Dashboard widget `herald_mail`; mail log + held panel on `/agents/herald`.

@@ -45,34 +45,59 @@ def settings() -> dict:
 
 
 # -- credentials -----------------------------------------------------------
-def address() -> str:
-    """The Gmail account Herald sends *from*, and by default *to*."""
+# Sending identity and owning identity are deliberately separate. When they are the same
+# mailbox, Gmail files the result as something you sent yourself — your own avatar, "me" in
+# the sender column, no importance signal to learn from. Pointing GMAIL_SENDER_ADDRESS at a
+# second (free) Google account makes Herald a correspondent instead of an echo, and is the
+# only thing that actually fixes it: Gmail's SMTP rewrites a From header that isn't the
+# authenticated account, so no amount of header dressing can fake a different sender.
+def owner_address() -> str:
+    """The user's own mailbox — what "addressed to you" means, and the default recipient."""
     return (os.environ.get("GMAIL_ADDRESS") or "").strip()
+
+
+def sender_address() -> str:
+    """The account Herald authenticates and sends as. Falls back to the owner's own."""
+    return (os.environ.get("GMAIL_SENDER_ADDRESS") or "").strip() or owner_address()
 
 
 def _password() -> str:
     """The 16-character app password. Google prints it in groups of four; strip the spaces."""
-    return (os.environ.get("GMAIL_APP_PASSWORD") or "").replace(" ", "").strip()
+    key = ("GMAIL_SENDER_APP_PASSWORD" if os.environ.get("GMAIL_SENDER_ADDRESS")
+           else "GMAIL_APP_PASSWORD")
+    return (os.environ.get(key) or "").replace(" ", "").strip()
+
+
+#: Kept as the old name so nothing outside this module has to care which identity it meant.
+address = sender_address
 
 
 def configured() -> bool:
-    return bool(address() and _password())
+    return bool(sender_address() and _password())
+
+
+def dedicated_sender() -> bool:
+    """True when Herald has its own account, so its mail is not self-addressed."""
+    return _normalize(sender_address()) != _normalize(owner_address())
 
 
 def status() -> dict:
     """What the UI needs to explain itself when Herald cannot send."""
     if not settings().get("enabled", True):
         return {"ok": False, "reason": "Herald is switched off in config/herald.json."}
-    if not address():
+    if not owner_address():
         return {"ok": False, "reason": "No GMAIL_ADDRESS in config/secrets.json."}
     if not _password():
-        return {"ok": False, "reason": "No GMAIL_APP_PASSWORD in config/secrets.json."}
-    return {"ok": True, "reason": "", "from": address(), "to": recipient()}
+        missing = ("GMAIL_SENDER_APP_PASSWORD" if os.environ.get("GMAIL_SENDER_ADDRESS")
+                   else "GMAIL_APP_PASSWORD")
+        return {"ok": False, "reason": f"No {missing} in config/secrets.json."}
+    return {"ok": True, "reason": "", "from": sender_address(), "to": recipient(),
+            "dedicated_sender": dedicated_sender()}
 
 
 def recipient() -> str:
-    """Where digests go — configured address, else the account itself."""
-    return (settings().get("to") or "").strip() or address()
+    """Where digests go — configured address, else the user's own account."""
+    return (settings().get("to") or "").strip() or owner_address()
 
 
 # -- recipient identity ----------------------------------------------------
@@ -96,8 +121,14 @@ def _normalize(addr: str) -> str:
 
 
 def is_self(addr: str) -> bool:
-    """True when this address is the account Herald sends from (the unattended-send path)."""
-    me = _normalize(address())
+    """True when this address is the *user's own* mailbox — the unattended-send path.
+
+    Deliberately keyed to the owner rather than the sender. Once Herald can send from its own
+    account, "who it comes from" and "who it may be sent to without asking" are different
+    questions, and only the second one is a safety gate: mail addressed to Herald's own sending
+    account is not mail to you, and must still be held.
+    """
+    me = _normalize(owner_address())
     return bool(me) and _normalize(addr) == me
 
 
@@ -205,7 +236,7 @@ async def _send_row(mid: int) -> dict:
             return {"ok": False, "reason": f"no message {mid}"}
         try:
             await asyncio.to_thread(_smtp_send, row["to_addr"], row["subject"],
-                                    row["html"], row["text"])
+                                    row["html"], row["text"], row["kind"])
         except Exception as e:
             store.mark_failed(c, mid, f"{type(e).__name__}: {e}")
             log.warning("herald send failed for message %d: %s", mid, e)
@@ -217,19 +248,34 @@ async def _send_row(mid: int) -> dict:
     return {"ok": True, "outcome": "sent", "id": mid}
 
 
-def _smtp_send(to_addr: str, subject: str, html: str, text: str) -> None:
+def _high_priority(kind: str) -> bool:
+    """Which letters claim priority. Alerts and nudges act on you; summaries do not."""
+    return kind in (settings().get("high_priority") or ["alert", "nudge"])
+
+
+def _smtp_send(to_addr: str, subject: str, html: str, text: str, kind: str = "manual") -> None:
     """One blocking SMTP conversation. Runs in a worker thread — never on the event loop.
 
     Sends ``multipart/alternative``: the plain-text part is the real message, the HTML part is
     the same content dressed. A client that refuses HTML still gets something readable.
+
+    On headers: the priority set is honoured by most desktop clients but **not** by Gmail's
+    importance markers, which are learned per-user and cannot be asserted by a sender — a Gmail
+    filter is the only thing that reliably marks these important. ``Auto-Submitted`` used to be
+    set here and is not any more: its only benefit was suppressing vacation auto-responders,
+    which is meaningless for mail you send yourself, while marking a message machine-generated
+    is exactly the signal that argues *against* the importance we want.
     """
-    sender = address()
+    sender = sender_address()
     msg = EmailMessage()
-    msg["From"] = formataddr((settings().get("from_name", "Orion"), sender))
+    msg["From"] = formataddr((settings().get("from_name", "Orion · Herald"), sender))
     msg["To"] = to_addr
     msg["Subject"] = subject
     msg["Message-ID"] = make_msgid(domain="orion.local")
-    msg["Auto-Submitted"] = "auto-generated"      # keeps vacation responders from replying
+    if _high_priority(kind):
+        msg["X-Priority"] = "1 (Highest)"
+        msg["Importance"] = "High"
+        msg["Priority"] = "urgent"
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
 

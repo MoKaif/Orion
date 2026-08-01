@@ -8,8 +8,26 @@
 
   "//to": "Where mail goes. Empty = the account's own address, which is the self-send path",
   "//to2": "that is allowed to send unattended. Any other address is approval-gated.",
+  "//to3": "Tip: set a +tag form of your own address (you+orion@gmail.com). It still counts as",
+  "//to4": "you, and it gives Gmail a filter target — the only reliable way to mark these",
+  "//to5": "important, label them, and keep them out of Promotions.",
   "to": "",
-  "from_name": "Orion",
+
+  "//from": "GMAIL_SENDER_ADDRESS + GMAIL_SENDER_APP_PASSWORD (optional, in secrets.json) let",
+  "//from2": "Herald send from its own free Google account. Without them it sends from your own",
+  "//from3": "address to your own address, and Gmail files that as mail you sent yourself —",
+  "//from4": "your avatar, 'me' as the sender, and no importance signal it can learn from.",
+  "//from5": "Gmail rewrites a From header that isn't the authenticated account, so a second",
+  "//from6": "account is the only thing that actually changes this.",
+  "from_name": "Orion · Herald",
+
+  "//subject": "Every subject is '<prefix> — <what happened> · <date>'. Fixed prefix so it is",
+  "//subject2": "recognisable and filterable; the tail says whether it needs opening.",
+  "subject_prefix": "Orion · Herald",
+
+  "//priority": "Letters that claim high priority. Honoured by most desktop clients; Gmail's",
+  "//priority2": "importance markers are learned per-user and cannot be asserted by a sender.",
+  "high_priority": ["alert", "nudge"],
 
   "//caps": "Herald must never become noise: a hard ceiling per day, and digests stay out of",
   "//caps2": "quiet hours. Alerts ignore quiet hours — a failure at 02:00 is worth knowing.",

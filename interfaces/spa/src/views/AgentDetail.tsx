@@ -262,6 +262,13 @@ export default function AgentDetail() {
           below is composed and filed, but nothing leaves the machine.
         </p>
       )}
+      {mailer?.ok && mailer.dedicated_sender === false && (
+        <p className="ap-blocked ap-note">
+          <CircleAlert size={14} /> Sending from your own address to your own address, so Gmail
+          files these as mail you sent yourself. Give Herald its own Google account
+          (GMAIL_SENDER_ADDRESS) to fix that.
+        </p>
+      )}
 
       <h2 className="ap-section">
         Passes <span className="count-pill">{jobs.length}</span>

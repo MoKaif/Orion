@@ -246,8 +246,8 @@ async def test_mail(body: TestMail):
                                   "The briefing that arrives each morning will look like this."]}],
         "footer": digest._FOOTER,
     }
-    return await mailer.deliver("manual", "Orion · Herald test", render.html(letter),
-                                render.text(letter), to=body.to)
+    return await mailer.deliver("manual", digest.subject("test", dated=False),
+                                render.html(letter), render.text(letter), to=body.to)
 
 
 @router.post("/send/{kind}")

@@ -10,6 +10,22 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.10.0] — 2026-08-01
+
+Herald sounds like a correspondent, not an echo of yourself
+
+### Added
+- Optional GMAIL_SENDER_ADDRESS / GMAIL_SENDER_APP_PASSWORD let Herald send from its own Google account. Sending from your address to your address makes Gmail file every briefing as mail you sent yourself — your avatar, 'me' as the sender, no importance signal — and no header can fix that, because Gmail rewrites a From it did not authenticate.
+- Priority headers on the letters that act on you (alerts and nudges by default, tunable via high_priority).
+- The agent page says so plainly when Herald is sending from your own address.
+
+### Changed
+- Every subject is now built in one place: 'Orion · Herald — what happened · date'. Fixed prefix so it is recognisable and filterable in a single Gmail rule; the tail still answers whether it needs opening; the date keeps two identical mornings from threading together.
+- is_self is keyed to the owner's mailbox rather than the sending account, so once Herald has its own address, mail addressed to Herald is still held for approval.
+
+### Removed
+- Auto-Submitted: auto-generated. Its only benefit was suppressing vacation auto-responders, which is meaningless for mail you send yourself, while marking the message machine-generated is the exact signal that argues against the importance we want.
+
 ## [0.9.1] — 2026-08-01
 
 Herald's overnight section reads like a summary, not a log

@@ -165,6 +165,8 @@ export interface MailerStatus {
   reason: string;
   from?: string;
   to?: string;
+  /** False when Herald sends from your own address, so Gmail files its mail as self-sent. */
+  dedicated_sender?: boolean;
 }
 
 /** An agent's own page. The optional panels are contributed by the agent itself. */

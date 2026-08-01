@@ -543,3 +543,13 @@
   color: var(--faint);
   white-space: nowrap;
 }
+
+/* An advisory, not a fault: Herald works, it just reads as self-sent mail. */
+.ap-blocked.ap-note {
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--line-2);
+}
+.ap-blocked.ap-note svg {
+  color: var(--copper);
+}
