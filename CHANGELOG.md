@@ -10,6 +10,16 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.9.1] — 2026-08-01
+
+Herald's overnight section reads like a summary, not a log
+
+### Changed
+- The prose model is given the per-job tally rather than a bare run count, so it can describe what ran instead of counting executions.
+
+### Fixed
+- The morning briefing listed every job run individually, so thirteen hourly vault-index runs buried the four passes that actually did something. Runs now collapse to one row per job ('Vault search index ... ok ×13'), with anything that failed sorted to the top.
+
 ## [0.9.0] — 2026-08-01
 
 Herald carries Orion out of the browser

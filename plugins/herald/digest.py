@@ -110,6 +110,27 @@ def _by_agent(items: list[dict[str, Any]]) -> Counter:
     return Counter(i.get("prov_agent") or "Orion" for i in items)
 
 
+def _run_tally(runs: list[dict[str, Any]], limit: int = 10) -> list[tuple[str, str]]:
+    """Collapse runs into one row per job: ``("Vault search index", "ok ×10")``.
+
+    Jobs fire at wildly different rates — the vault index is hourly, the Curator's passes are
+    nightly — so a flat list of runs is really a list of whichever job runs most often. Anything
+    that failed sorts to the top, because that is the row worth reading first.
+    """
+    tally: dict[str, Counter] = {}
+    for r in runs:
+        tally.setdefault(r["label"], Counter())["ok" if r.get("ok") else "failed"] += 1
+
+    rows = []
+    for label, c in sorted(tally.items(), key=lambda kv: (-kv[1]["failed"], -sum(kv[1].values()))):
+        total = c["ok"] + c["failed"]
+        if c["failed"]:
+            rows.append((label, f"{c['failed']} failed of {total}"))
+        else:
+            rows.append((label, "ok" if total == 1 else f"ok ×{total}"))
+    return rows[:limit]
+
+
 def _money(usd: float) -> str:
     return "$0.00" if usd < 0.005 else f"${usd:,.2f}"
 
@@ -183,7 +204,9 @@ async def morning_briefing() -> dict:
         "waiting_for_you": len(items),
         "waiting_by_agent": dict(_by_agent(items)),
         "oldest_waiting_days": round(oldest, 1),
-        "jobs_ran_overnight": len(runs),
+        "runs_overnight": len(runs),
+        # per job, so the prose can say "the index ran hourly" instead of counting runs
+        "overnight_by_job": dict(_run_tally(runs, limit=20)),
         "jobs_failed": [{"job": r["label"], "error": str(r.get("result"))[:200]}
                         for r in failures],
         "world_model": stats,
@@ -204,9 +227,11 @@ async def morning_briefing() -> dict:
                          "blurb": "Nothing. The review queue is empty."})
 
     if runs:
+        # One row per *job*, not per run. The vault index fires hourly, so listing runs
+        # individually buried the interesting passes under ten identical lines.
         sections.append({
             "heading": "Overnight",
-            "rows": [(r["label"], "ok" if r.get("ok") else "failed") for r in runs[:10]],
+            "rows": _run_tally(runs),
             "accent": render.FACT if not failures else render.IDEA,
         })
     if failures:
