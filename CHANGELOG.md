@@ -10,6 +10,21 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.9.0] — 2026-08-01
+
+Herald carries Orion out of the browser
+
+### Added
+- Herald, a third agent: an outbound Gmail mail service. A morning briefing (what ran overnight, what is waiting, what it cost), alerts when a job fails or spend crosses your line, a Monday letter, and one nudge when the review queue starts to rot.
+- The send gate is drawn by recipient: mail to your own account goes unattended, anything addressed elsewhere is held in the outbox with its full text on an inbox card until you release it. send_email was already in the constitution's irreversible actions; mailer.deliver is what enforces it.
+- A send_email tool, so a chat turn can ask Orion to mail something — confirm-gated at the orchestrator and again at the recipient.
+- config/herald.json: daily cap, quiet hours, alert thresholds and nudge timing, all retunable per machine through the local overlay.
+- A mail log and held-message panel on /agents/herald, and a herald_mail dashboard widget.
+
+### Changed
+- Letters compute their own figures and ask deepseek-v4-flash only for the prose around them, so the model cannot invent a count — and a letter still goes out figures-only when the provider is down or over budget.
+- The inbox resolver routes on the item's origin rather than a closed list, so a plugin can contribute cards core has never heard of.
+
 ## [0.8.1] — 2026-07-26
 
 Curator passes stop colliding with themselves and the db

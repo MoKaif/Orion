@@ -5,12 +5,14 @@ import {
   BookOpen,
   Bot,
   Compass,
+  Mail,
   Play,
   Loader2,
   Pause,
   RotateCw,
   ExternalLink,
   Check,
+  CircleAlert,
   LucideIcon,
 } from "lucide-react";
 import {
@@ -26,7 +28,12 @@ import { ShiftStrip } from "../components/shift";
 import { agoText, describeCron, untilText } from "../cron";
 import "./agent-detail.css";
 
-const ICONS: Record<string, LucideIcon> = { "book-open": BookOpen, compass: Compass, bot: Bot };
+const ICONS: Record<string, LucideIcon> = {
+  "book-open": BookOpen,
+  compass: Compass,
+  mail: Mail,
+  bot: Bot,
+};
 
 function runState(job: Job) {
   if (job.running_since) return { tone: "busy", text: "running" };
@@ -199,6 +206,8 @@ export default function AgentDetail() {
   const proposals = data.proposals ?? [];
   const questions = data.questions ?? [];
   const entities = data.entities ?? [];
+  const mail = data.mail ?? [];
+  const mailer = data.mailer;
   const threshold = data.hub_threshold ?? 3;
   const Icon = ICONS[agent.icon] ?? Bot;
   const metrics = summary.metrics ?? [];
@@ -246,6 +255,13 @@ export default function AgentDetail() {
           <ShiftStrip jobs={jobs} />
         </div>
       </section>
+
+      {mailer && !mailer.ok && (
+        <p className="ap-blocked">
+          <CircleAlert size={14} /> Not sending yet — {mailer.reason} Until then every letter
+          below is composed and filed, but nothing leaves the machine.
+        </p>
+      )}
 
       <h2 className="ap-section">
         Passes <span className="count-pill">{jobs.length}</span>
@@ -348,6 +364,36 @@ export default function AgentDetail() {
                 </li>
               ))}
             </ul>
+          </div>
+        </>
+      )}
+
+      {mail.length > 0 && (
+        <>
+          <h2 className="ap-section">
+            The mail log <span className="count-pill">{mail.length}</span>
+            {mailer?.to && <span className="ap-section-note">to {mailer.to}</span>}
+          </h2>
+          <div className="card">
+            <ul className="mail-log">
+              {mail.map((m) => (
+                <li className="mail-row" key={m.id}>
+                  <span className={`mail-state ms-${m.status}`}>{m.status}</span>
+                  <span className="mail-subject" title={m.reason ?? undefined}>
+                    {m.subject}
+                  </span>
+                  <i className="leader" />
+                  <time className="mail-time">{agoText(m.sent_at ?? m.created_at)}</time>
+                </li>
+              ))}
+            </ul>
+            {mail.some((m) => m.status === "held") && (
+              <p className="registry-hint">
+                Held messages are addressed outside your own account, so they wait for you.{" "}
+                <Link to="/inbox">Review them in the inbox</Link> — nothing is sent until you say
+                so, and mail cannot be recalled afterwards.
+              </p>
+            )}
           </div>
         </>
       )}

@@ -29,7 +29,10 @@ export interface DuplicatePlan {
 }
 
 export interface InboxItem {
-  origin: "world_model" | "curator" | "curator_question";
+  /** Which source produced this. The named ones are what the resolver knows how to route;
+   *  any plugin may register a source with an origin core has never heard of, so the type
+   *  stays open and unknown origins fall through to the world-model review endpoint. */
+  origin: "world_model" | "curator" | "curator_question" | "herald" | (string & {});
   id: number;
   created_at: string;
   prov_agent: string;
@@ -144,6 +147,26 @@ export interface RegistryEntity {
   note_path: string | null;
 }
 
+/** One row of Herald's outbox: queued · held (waiting on you) · sent · failed · cancelled. */
+export interface MailMessage {
+  id: number;
+  kind: string;
+  to_addr: string;
+  subject: string;
+  status: string;
+  reason: string | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
+/** Whether Herald can send at all, and as whom. */
+export interface MailerStatus {
+  ok: boolean;
+  reason: string;
+  from?: string;
+  to?: string;
+}
+
 /** An agent's own page. The optional panels are contributed by the agent itself. */
 export interface AgentDetail {
   agent: AgentIdentity;
@@ -153,6 +176,9 @@ export interface AgentDetail {
   questions?: Question[];
   entities?: RegistryEntity[];
   hub_threshold?: number;
+  mail?: MailMessage[];
+  held?: MailMessage[];
+  mailer?: MailerStatus;
 }
 
 export interface JobPatch {
@@ -268,6 +294,10 @@ export function useResolveInbox() {
         // curator proposals use apply|reject
         const a = action === "accept" ? "apply" : action === "reject" ? "reject" : action;
         await postForm(`/plugins/curator/proposals/${item.id}`, { action: a });
+      } else if (item.origin === "herald") {
+        // a held message: send|cancel. Nothing leaves the machine until this call.
+        const a = action === "accept" ? "send" : action === "reject" ? "cancel" : action;
+        await postForm(`/plugins/herald/outbox/${item.id}`, { action: a });
       } else {
         await postForm(`/reviews/${item.id}`, { action });
       }
@@ -275,7 +305,8 @@ export function useResolveInbox() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inbox"] });
       qc.invalidateQueries({ queryKey: ["agents"] });
-      qc.invalidateQueries({ queryKey: ["agent", "curator"] });
+      // prefix match: whichever agent owned the item gets its page refreshed
+      qc.invalidateQueries({ queryKey: ["agent"] });
       qc.invalidateQueries({ queryKey: ["vitals"] });
     },
   });

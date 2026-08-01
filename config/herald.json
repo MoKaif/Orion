@@ -1,0 +1,36 @@
+{
+  "//": "Herald — Orion's voice outside the browser. Outbound Gmail SMTP only; it never reads",
+  "//2": "your mail. Credentials are NEVER here: GMAIL_ADDRESS + GMAIL_APP_PASSWORD come from",
+  "//3": "the environment (seeded by the gitignored config/secrets.json). With no key Herald",
+  "//4": "renders as 'not configured' and every job no-ops.",
+  "//5": "Anything retuned at runtime lands in config/herald.local.json (gitignored).",
+  "enabled": true,
+
+  "//to": "Where mail goes. Empty = the account's own address, which is the self-send path",
+  "//to2": "that is allowed to send unattended. Any other address is approval-gated.",
+  "to": "",
+  "from_name": "Orion",
+
+  "//caps": "Herald must never become noise: a hard ceiling per day, and digests stay out of",
+  "//caps2": "quiet hours. Alerts ignore quiet hours — a failure at 02:00 is worth knowing.",
+  "daily_cap": 6,
+  "quiet_hours": [22, 7],
+
+  "//prose": "true = deepseek-v4-flash writes the letter around the figures. Every number is",
+  "//prose2": "still rendered deterministically; the model only writes prose. If it is",
+  "//prose3": "unavailable the mail still goes out, template-only.",
+  "prose": true,
+
+  "alerts": {
+    "//": "Event-driven mail. spend_usd fires once a day's cloud cost crosses it.",
+    "spend_usd": 0.5,
+    "cooldown_hours": 12
+  },
+
+  "nudge": {
+    "//": "One reminder when the review queue starts rotting — never a daily drip.",
+    "after_days": 3,
+    "min_items": 3,
+    "cooldown_hours": 72
+  }
+}

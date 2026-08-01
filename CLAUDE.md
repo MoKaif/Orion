@@ -180,7 +180,8 @@ copper/fact/observation/idea, order, optional `summary()`/`detail()` callbacks, 
 defensively). Core ships **Conductor** (`maintenance.py` — consolidate + weekly briefing; named
 Conductor because `orchestrator.py` already means the per-turn pipeline). The curator plugin ships
 **Curator** (its five passes + `knowledge`'s `index_vault`, which declares `agent="curator"`).
-There is no hardcoded job→agent map in core any more — a third agent is one `add_agent` call.
+There is no hardcoded job→agent map in core any more — the third agent, **Herald**
+(`plugins/herald/`, mail), was exactly one `add_agent` call and zero core changes.
 
 - `ScheduledJob` carries `agent` · `label` · `description` · `limit_default`; unknown agent names
   fall back to the Conductor. `job_limit(name, default)` is read **at run time**, so a batch-size
@@ -197,6 +198,40 @@ There is no hardcoded job→agent map in core any more — a third agent is one 
 - SPA views: `views/Agents.tsx` (cards only, no run buttons) → `views/AgentDetail.tsx` (run +
   per-pass schedule/batch/pause controls, the agent's panels, merged run log). `components/shift.tsx`
   draws the 24-hour **shift strip** from each job's cron (`src/cron.ts` parses/describes it).
+
+## Herald plugin (v1 done) — the first agent that reaches *you*
+
+`plugins/herald/` — Orion's voice outside the browser, and the answer to "a briefing that only
+exists at 127.0.0.1:8000 is a briefing nobody reads." **Outbound Gmail SMTP only; it never reads
+your mail.** Four letters: `morning_briefing` (07:30) · `herald_alerts` (every 30 min, silent
+unless something is wrong) · `weekly_letter` (Mon 09:00) · `inbox_nudge` (19:00, one reminder,
+never a drip). Own store: `data/herald.db` (WAL + 30 s busy_timeout like the Curator's).
+
+- **The gate is drawn by recipient.** Mail to the account's own address sends unattended — an
+  approval prompt on your own briefing is theatre. Anything addressed elsewhere is **held** in
+  the outbox with its full text on an inbox card until you release it. `send_email` was already
+  in `constitution.IRREVERSIBLE_ACTIONS`; `mailer.deliver` is what enforces it. `mailer.is_self`
+  applies Gmail's own equivalence rules (dots, `+tags`) so a lookalike address can't slip through.
+- **Every message is a durable row before it is a network call** (`outbox`), so a held message
+  can wait forever, a failed send can retry, and you can always read what was sent in your name.
+  `smtplib` runs in `asyncio.to_thread` — never on the event loop.
+- **The figures are computed; only the prose is generated.** `digest._lede` hands
+  deepseek-v4-flash a JSON block of already-true numbers and asks for two paragraphs of framing,
+  so it cannot invent a count. No key / over budget / provider down ⇒ the letter goes out
+  figures-only rather than not at all.
+- **Never noise**: `daily_cap` + `quiet_hours` are checked before the socket opens (alerts
+  deliberately ignore quiet hours); the `alerts` table is a cooldown ledger keyed on the
+  *identity* of a problem (`job_failed:curate_vault`), so a job failing all night mails once and
+  re-arms when it goes green.
+- Credentials: `GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` from gitignored `config/secrets.json`
+  only. No key ⇒ `mailer.status()` explains itself, jobs no-op, the agent page shows a banner.
+  Tuning lives in tracked `config/herald.json` (+ `herald.local.json` overlay).
+- API: `/plugins/herald/status` · `/outbox[/{id}]` · `POST /outbox/{id}` (send|cancel) ·
+  `POST /preview` (renders a letter free, no prose call) · `POST /test` · `POST /send/{kind}`.
+  Dashboard widget `herald_mail`; mail log + held panel on `/agents/herald`.
+- `render.py` repeats the design tokens **literally** — the one place duplicating them is
+  correct, since Gmail strips `<style>` and `class`, and CSS custom properties can't survive.
+  Tables, not flexbox; inline styles only; `multipart/alternative` with a real text part.
 
 ## Curator plugin (v1 done)
 

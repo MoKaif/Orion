@@ -1,0 +1,27 @@
+{
+  "//": "Herald — Orion's voice outside the browser. Outbound Gmail SMTP only; it never reads",
+  "//2": "mail. Four letters (briefing, alerts, weekly, nudge) plus a send_email tool. Mail to",
+  "//3": "the user's own account sends unattended; anything else is held for approval.",
+  "name": "herald",
+  "version": "1.0.0",
+  "specialists": [],
+  "agents": ["herald"],
+  "tools": ["send_email"],
+  "entity_types": [],
+  "relationship_types": [],
+  "background_jobs": [
+    { "name": "morning_briefing", "cron": "30 7 * * *" },
+    { "name": "herald_alerts", "cron": "*/30 * * * *" },
+    { "name": "weekly_letter", "cron": "0 9 * * 1" },
+    { "name": "inbox_nudge", "cron": "0 19 * * *" }
+  ],
+  "api_routes": [
+    "/plugins/herald/status",
+    "/plugins/herald/outbox",
+    "/plugins/herald/preview",
+    "/plugins/herald/test",
+    "/plugins/herald/send/{kind}"
+  ],
+  "dashboard_widgets": ["herald_mail"],
+  "permissions": ["send_email"]
+}

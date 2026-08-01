@@ -4,6 +4,7 @@ import {
   BookOpen,
   Bot,
   Compass,
+  Mail,
   ArrowRight,
   Loader2,
   CircleAlert,
@@ -20,6 +21,7 @@ import "./agents.css";
 const ICONS: Record<string, LucideIcon> = {
   "book-open": BookOpen,
   compass: Compass,
+  mail: Mail,
   bot: Bot,
 };
 

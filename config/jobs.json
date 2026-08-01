@@ -15,6 +15,11 @@
     "grow_memory":      { "enabled": true, "cron": "30 3 * * *", "limit": 8, "//": "Curator · journal to memory" },
     "weave_graph":      { "enabled": true, "cron": "45 3 * * *", "limit": 8, "//": "Curator · backlinks" },
     "curator_backfill": { "enabled": true, "cron": "0 4 * * *",  "limit": 8, "//": "Curator · a slice of every pass" },
-    "index_vault":      { "enabled": true, "cron": "0 * * * *",  "//": "Curator · hourly search index" }
+    "index_vault":      { "enabled": true, "cron": "0 * * * *",  "//": "Curator · hourly search index" },
+
+    "morning_briefing": { "enabled": true, "cron": "30 7 * * *", "//": "Herald · the daily letter" },
+    "herald_alerts":    { "enabled": true, "cron": "*/30 * * * *", "//": "Herald · quiet unless something broke" },
+    "weekly_letter":    { "enabled": true, "cron": "0 9 * * 1",  "//": "Herald · Mondays 09:00" },
+    "inbox_nudge":      { "enabled": true, "cron": "0 19 * * *", "//": "Herald · one reminder, not a drip" }
   }
 }

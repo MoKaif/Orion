@@ -472,3 +472,74 @@
   color: var(--faint);
   white-space: nowrap;
 }
+
+/* ---- Herald: the mail log --------------------------------------------- */
+/* A banner, not a toast: "Herald cannot send" is a standing condition until you add a
+   key, and it must stay legible above the passes it explains. */
+.ap-blocked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 11px 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--idea);
+  background: color-mix(in srgb, var(--idea) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--idea) 34%, transparent);
+  border-radius: 4px;
+}
+.ap-blocked svg {
+  flex: 0 0 auto;
+}
+
+.ap-section-note {
+  margin-left: auto;
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+}
+
+.mail-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.mail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.mail-state {
+  font: 600 9px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 3px 6px;
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+.ms-sent {
+  color: var(--ok);
+}
+.ms-held {
+  color: var(--copper);
+}
+.ms-failed {
+  color: var(--danger);
+}
+.mail-subject {
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mail-time {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
