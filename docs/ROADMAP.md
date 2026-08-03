@@ -119,6 +119,16 @@ reference implementation.
 
 - [ ] Content plugins: `operations`, `finance`, `health`, `calendar` specialists + tools.
 - [ ] Raspberry Pi / voice client as another thin interface to the same backend.
+- [x] **Maintainer** (`plugins/maintainer/`) — the first agent that changes code outside Orion.
+      DeepSeek reads each project overnight and proposes work; you approve the brief in the
+      inbox; **Claude Code on the host** does the engineering in a throwaway worktree; a pull
+      request comes back for you to review. It never merges and never writes to a checkout you
+      use. The container gets the workspace read-only and does no execution at all — the hands
+      are `scripts/maintainer_runner.py`, a `systemd --user` service that claims work over HTTP.
+      One core addition (`orion/core/reports.py` + `plugin_sdk.add_report_source`) lets a plugin
+      contribute sections, facts and alerts to another agent's letters, which is how Herald
+      reports Maintainer's nights without knowing Maintainer exists.
+      Next: chat-initiated tasks, Orion self-improvement (one config flag), PR-comment iteration.
 - [x] **Cloud orchestrator hardening** — prompt caching (cacheable stable system prefix,
       separated from the volatile per-turn world-model context), per-model **$** cost tracking
       (cache-aware pricing table; `usage.json` records tokens + dollars split by model; the

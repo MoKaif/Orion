@@ -13,11 +13,13 @@ import {
   ExternalLink,
   Check,
   CircleAlert,
+  GitPullRequest,
   LucideIcon,
 } from "lucide-react";
 import {
   InboxItem,
   Job,
+  MaintainerRun,
   useAgentDetail,
   useResolveInbox,
   useRunJob,
@@ -33,7 +35,16 @@ const ICONS: Record<string, LucideIcon> = {
   compass: Compass,
   mail: Mail,
   bot: Bot,
+  "git-pull-request": GitPullRequest,
 };
+
+/** A run's one-line verdict: the diffstat when it stands up, the reason when it doesn't. */
+function runVerdict(r: MaintainerRun) {
+  if (r.status === "failed") return { tone: "failed", text: r.error || "failed" };
+  if (r.verify === "failed") return { tone: "failed", text: "build failed" };
+  if (r.files_changed === 0) return { tone: "idle", text: "no change needed" };
+  return { tone: "ok", text: `+${r.insertions} −${r.deletions} in ${r.files_changed} files` };
+}
 
 function runState(job: Job) {
   if (job.running_since) return { tone: "busy", text: "running" };
@@ -208,6 +219,10 @@ export default function AgentDetail() {
   const entities = data.entities ?? [];
   const mail = data.mail ?? [];
   const mailer = data.mailer;
+  const maintainer = data.maintainer;
+  const queue = (data.queue ?? []).filter((t) => t.status === "proposed");
+  const prs = data.prs ?? [];
+  const codeRuns = data.runs ?? [];
   const threshold = data.hub_threshold ?? 3;
   const Icon = ICONS[agent.icon] ?? Bot;
   const metrics = summary.metrics ?? [];
@@ -267,6 +282,13 @@ export default function AgentDetail() {
           <CircleAlert size={14} /> Sending from your own address to your own address, so Gmail
           files these as mail you sent yourself. Give Herald its own Google account
           (GMAIL_SENDER_ADDRESS) to fix that.
+        </p>
+      )}
+
+      {maintainer && !maintainer.ok && (
+        <p className="ap-blocked">
+          <CircleAlert size={14} /> {maintainer.reason} Until then Maintainer can read your
+          projects and propose work, but nothing can be built.
         </p>
       )}
 
@@ -401,6 +423,93 @@ export default function AgentDetail() {
                 so, and mail cannot be recalled afterwards.
               </p>
             )}
+          </div>
+        </>
+      )}
+
+      {prs.length > 0 && (
+        <>
+          <h2 className="ap-section">
+            Pull requests waiting on you <span className="count-pill alert">{prs.length}</span>
+            <span className="ap-section-note">Orion cannot merge — that stays your hand</span>
+          </h2>
+          <div className="card">
+            <ul className="pr-list">
+              {prs.map((r) => {
+                const v = runVerdict(r);
+                return (
+                  <li className="pr-row" key={r.id}>
+                    <span className={`pr-state pv-${v.tone}`}>{r.repo}</span>
+                    <a className="pr-title" href={r.pr_url ?? "#"} target="_blank" rel="noreferrer">
+                      {r.title} <ExternalLink size={11} />
+                    </a>
+                    <i className="leader" />
+                    <span className="pr-stat">{v.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
+      )}
+
+      {queue.length > 0 && (
+        <>
+          <h2 className="ap-section">
+            Work it wants to start <span className="count-pill alert">{queue.length}</span>
+            <Link to="/inbox" className="btn btn-sm btn-ghost ap-section-act">
+              approve in inbox <ExternalLink size={12} />
+            </Link>
+          </h2>
+          <div className="card">
+            <ul className="q-list">
+              {queue.slice(0, 10).map((t) => (
+                <li key={t.id} className="q-item">
+                  <span className="q-subject">
+                    {t.repo} · {t.risk} risk
+                  </span>
+                  <p className="q-text">
+                    <b>{t.title}</b>
+                    {t.rationale ? ` — ${t.rationale}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="registry-hint">
+              Nothing here has run. Approving one hands it to Claude Code on your own machine, in
+              a throwaway worktree, and opens a pull request you review on GitHub.
+            </p>
+          </div>
+        </>
+      )}
+
+      {codeRuns.length > 0 && (
+        <>
+          <h2 className="ap-section">
+            The work log <span className="count-pill">{codeRuns.length}</span>
+          </h2>
+          <div className="card">
+            <ul className="mail-log">
+              {codeRuns.map((r) => {
+                const v = runVerdict(r);
+                return (
+                  <li className="mail-row" key={r.id}>
+                    <span className={`mail-state ms-${v.tone === "ok" ? "sent" : v.tone}`}>
+                      {r.repo}
+                    </span>
+                    <span className="mail-subject" title={r.summary || undefined}>
+                      {r.title}
+                    </span>
+                    <i className="leader" />
+                    <span className="pr-stat">{v.text}</span>
+                    <time className="mail-time">
+                      {agoText(r.ended_at ?? r.started_at)}
+                      {r.duration_s ? ` · ${Math.round(r.duration_s / 60)}m` : ""}
+                    </time>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </>
       )}

@@ -9,6 +9,7 @@ import {
   Loader2,
   CircleAlert,
   PauseCircle,
+  GitPullRequest,
   LucideIcon,
 } from "lucide-react";
 import { AgentCard, useAgents } from "../api";
@@ -23,6 +24,7 @@ const ICONS: Record<string, LucideIcon> = {
   compass: Compass,
   mail: Mail,
   bot: Bot,
+  "git-pull-request": GitPullRequest,
 };
 
 /** One state line per agent, in priority order — never two competing signals at once. */

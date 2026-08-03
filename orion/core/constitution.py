@@ -12,7 +12,7 @@ _TEXT_PATH = Path(__file__).with_name("constitution.md")
 # Enforced in code, not merely prompted. Actions matching these require human approval.
 IRREVERSIBLE_ACTIONS = frozenset(
     {"send_email", "delete_file", "spend_money", "book_travel",
-     "cancel_subscription", "share_document", "shell"}
+     "cancel_subscription", "share_document", "shell", "merge_pr"}
 )
 
 

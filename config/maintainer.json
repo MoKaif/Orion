@@ -1,0 +1,98 @@
+{
+  "//": "Maintainer — the agent that proposes code changes and opens pull requests you review.",
+  "//2": "Paths are identical inside the container and on the host: the workspace is bind-mounted",
+  "//3": "READ-ONLY at the same path, so Orion can scan a repo but is incapable of writing to one.",
+  "//4": "Only scripts/maintainer_runner.py (on the host) ever writes, and only inside `worktrees`.",
+  "//5": "Machine tuning belongs in the gitignored maintainer.local.json overlay, not here.",
+
+  "workspace": "/home/nox/Developing-Environment",
+  "worktrees": "/home/nox/.local/share/orion-maintainer",
+
+  "runner": {
+    "//": "One task at a time. max_run_minutes bounds a Claude run; the sweep job reaps",
+    "//2": "anything still silent past it, so a killed runner cannot strand a task forever.",
+    "poll_seconds": 20,
+    "max_run_minutes": 45,
+    "install_minutes": 20,
+    "//6": "A diff bigger than this is not a review, it is archaeology — the run fails instead.",
+    "max_files": 200
+  },
+
+  "claude": {
+    "//": "Headless Claude Code on the host. Auth is the OAuth session in ~/.claude — never",
+    "//2": "pass --bare, which forces ANTHROPIC_API_KEY and would bill the empty API account.",
+    "bin": "claude",
+    "model": "sonnet",
+    "max_turns": 40,
+    "permission_mode": "acceptEdits"
+  },
+
+  "scan": {
+    "//": "The nightly read. Facts are gathered here; DeepSeek only shapes them into briefs.",
+    "max_candidates_per_repo": 2,
+    "commits": 25,
+    "todo_hits": 20,
+    "expire_briefs_days": 14,
+    "skip": [".env", ".env.local", ".env.production", "secrets", "credentials",
+             "node_modules", ".git", "dist", ".next", "bin", "obj", "venv", "publish"]
+  },
+
+  "repos": {
+    "FinStrive": {
+      "path": "FinStrive",
+      "base": "main",
+      "blurb": "Personal finance app: .NET API, React frontend, PostgreSQL.",
+      "install": "npm --prefix frontend ci",
+      "install_marker": "frontend/node_modules",
+      "verify": "dotnet build api/api.csproj -v q",
+      "enabled": true
+    },
+    "ArcVe": {
+      "path": "ArcVe/ArcVe",
+      "base": "main",
+      "blurb": "Gaming documentation / library dashboard, deployed on Vercel.",
+      "install": "npm ci",
+      "install_marker": "node_modules",
+      "verify": "npm run build",
+      "enabled": true
+    },
+    "noxctl": {
+      "path": "noxctl",
+      "base": "main",
+      "blurb": "Server control plane for Docker services on the LAN — it is what starts Orion.",
+      "install": "npm ci",
+      "install_marker": "node_modules",
+      "verify": "npm run build",
+      "enabled": true
+    },
+    "Timepieces": {
+      "path": "Timepieces",
+      "base": "main",
+      "blurb": "Watch collection catalogue.",
+      "install": "pnpm install --frozen-lockfile",
+      "install_marker": "node_modules",
+      "verify": "pnpm build",
+      "enabled": true
+    },
+    "purple-buccaneers": {
+      "path": "purple-buccaneers",
+      "base": "main",
+      "blurb": "Next.js site.",
+      "install": "npm ci",
+      "install_marker": "node_modules",
+      "verify": "npm run build && npm run typecheck",
+      "enabled": true
+    },
+    "Orion-v2": {
+      "//": "Orion improving itself. Deliberately off for v1 — turn it on once you have watched",
+      "//2": "Maintainer work on someone else's code first. Nothing else needs to change.",
+      "path": "Orion-v2",
+      "base": "main",
+      "blurb": "Orion itself.",
+      "install": "",
+      "install_marker": "",
+      "verify": "python -c \"import orion\"",
+      "enabled": false
+    }
+  }
+}

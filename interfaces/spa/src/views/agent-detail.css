@@ -532,6 +532,10 @@
 .ms-failed {
   color: var(--danger);
 }
+/* a run that correctly changed nothing — neither success nor fault */
+.ms-idle {
+  color: var(--faint);
+}
 .mail-subject {
   color: var(--ink);
   white-space: nowrap;
@@ -552,4 +556,61 @@
 }
 .ap-blocked.ap-note svg {
   color: var(--copper);
+}
+
+/* Maintainer: pull requests waiting on review.
+   The row leads with the repo rather than the state, because "which project" is the first
+   thing you need on a phone at 07:30 — the verdict trails after the leader dots. */
+.pr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.pr-state {
+  font: 600 9px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 3px 6px;
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+.pv-ok {
+  color: var(--ok);
+}
+.pv-failed {
+  color: var(--danger);
+}
+.pv-idle {
+  color: var(--faint);
+}
+.pr-title {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-title:hover {
+  border-bottom-color: var(--copper);
+}
+.pr-title svg {
+  opacity: 0.5;
+  vertical-align: -1px;
+}
+.pr-stat {
+  font: 500 11px/1 var(--mono);
+  color: var(--faint);
+  white-space: nowrap;
 }

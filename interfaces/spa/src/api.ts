@@ -169,6 +169,61 @@ export interface MailerStatus {
   dedicated_sender?: boolean;
 }
 
+/** One piece of work Maintainer wants to do, or has done. */
+export interface MaintainerTask {
+  id: number;
+  repo: string;
+  title: string;
+  rationale: string;
+  risk: string;
+  status: string;
+  created_at: string;
+}
+
+/** One attempt at a task: what Claude did, whether it stood up, what it cost. */
+export interface MaintainerRun {
+  id: number;
+  task_id: number;
+  repo: string;
+  title: string;
+  status: string;
+  branch: string | null;
+  pr_url: string | null;
+  pr_state: string | null;
+  files_changed: number;
+  insertions: number;
+  deletions: number;
+  turns: number;
+  cost_usd: number;
+  duration_s: number;
+  /** passed | failed | skipped — whether the repo's own build agreed. */
+  verify: string;
+  summary: string;
+  error: string | null;
+  started_at: string;
+  ended_at: string | null;
+}
+
+/** Whether Maintainer can work, and which link is broken when it cannot. */
+export interface MaintainerStatus {
+  ok: boolean;
+  /** ready | no token | no workspace | no git | waiting */
+  state: string;
+  reason: string;
+  runner: string | null;
+  runner_seen: string | null;
+  repos: string[];
+  workspace: string;
+}
+
+export interface MaintainerRepo {
+  name: string;
+  base: string;
+  blurb: string;
+  verify: string;
+  enabled: boolean;
+}
+
 /** An agent's own page. The optional panels are contributed by the agent itself. */
 export interface AgentDetail {
   agent: AgentIdentity;
@@ -181,6 +236,11 @@ export interface AgentDetail {
   mail?: MailMessage[];
   held?: MailMessage[];
   mailer?: MailerStatus;
+  maintainer?: MaintainerStatus;
+  queue?: MaintainerTask[];
+  prs?: MaintainerRun[];
+  runs?: MaintainerRun[];
+  repos?: MaintainerRepo[];
 }
 
 export interface JobPatch {
@@ -300,6 +360,10 @@ export function useResolveInbox() {
         // a held message: send|cancel. Nothing leaves the machine until this call.
         const a = action === "accept" ? "send" : action === "reject" ? "cancel" : action;
         await postForm(`/plugins/herald/outbox/${item.id}`, { action: a });
+      } else if (item.origin === "maintainer") {
+        // a brief: approve|reject. Approving only queues the work for the host runner —
+        // the pull request it opens is still yours to merge or close.
+        await postForm(`/plugins/maintainer/tasks/${item.id}`, { action });
       } else {
         await postForm(`/reviews/${item.id}`, { action });
       }

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from orion.core import agents, inbox, specialists, widgets
+from orion.core import agents, inbox, reports, specialists, widgets
 from orion.core.scheduler import ScheduledJob, configured_cron, job_limit, scheduler
 from orion.core.tools import registry as _tools
 from orion.core.tools.base import BaseTool, ToolResult
@@ -34,7 +34,7 @@ from orion.core.world_model import types as _types
 __all__ = [
     "add_tool", "add_specialist", "add_agent", "add_job", "job_limit",
     "add_entity_type", "add_relationship_type", "add_widget",
-    "add_inbox_source", "inbox_action",
+    "add_inbox_source", "inbox_action", "add_report_source",
     "Specialist", "BaseTool", "ToolResult", "Widget",
 ]
 
@@ -112,3 +112,19 @@ def add_inbox_source(name: str, fetch: Callable[[], list[dict]], plugin: str = "
     ``inbox_action``) naming each outcome in the user's own words.
     """
     inbox.register(inbox.InboxSource(name=name, fetch=fetch, plugin=plugin))
+
+
+def add_report_source(name: str, *,
+                      sections: Callable[[str], list[dict]] | None = None,
+                      facts: Callable[[str], dict] | None = None,
+                      alerts: Callable[[], list[dict]] | None = None,
+                      plugin: str = "core") -> None:
+    """Contribute this plugin's news to the letters another agent writes.
+
+    ``sections(scope)`` returns letter sections, ``facts(scope)`` returns keys for the prose
+    model's JSON block, ``alerts()`` returns problems worth mailing about. ``scope`` is the
+    letter being written ("briefing" · "weekly"). See ``orion.core.reports``; all three are
+    optional and none of them may raise a letter out of existence.
+    """
+    reports.register(reports.ReportSource(name=name, sections=sections, facts=facts,
+                                          alerts=alerts, plugin=plugin))

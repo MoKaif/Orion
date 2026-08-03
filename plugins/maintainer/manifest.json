@@ -1,0 +1,26 @@
+{
+  "//": "Maintainer — proposes code changes to the user's projects and opens pull requests.",
+  "//2": "Reads repos through a read-only mount; all writing happens on the host, in",
+  "//3": "scripts/maintainer_runner.py, inside throwaway worktrees. It never merges.",
+  "name": "maintainer",
+  "version": "1.0.0",
+  "specialists": [],
+  "agents": ["maintainer"],
+  "tools": [],
+  "entity_types": [],
+  "relationship_types": [],
+  "background_jobs": [
+    { "name": "scan_repos", "cron": "0 1 * * *" },
+    { "name": "maintainer_sweep", "cron": "*/15 * * * *" }
+  ],
+  "api_routes": [
+    "/plugins/maintainer/status",
+    "/plugins/maintainer/tasks",
+    "/plugins/maintainer/runs",
+    "/plugins/maintainer/repos",
+    "/plugins/maintainer/scan",
+    "/plugins/maintainer/runner/claim"
+  ],
+  "dashboard_widgets": ["maintainer_prs"],
+  "permissions": ["read_workspace", "queue_code_runs"]
+}

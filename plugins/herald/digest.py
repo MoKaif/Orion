@@ -50,6 +50,26 @@ def _inbox() -> list[dict[str, Any]]:
         return []
 
 
+def _plugin_sections(scope: str) -> list[dict[str, Any]]:
+    """What the other agents have to say. Herald knows none of them by name."""
+    from orion.core import reports
+    try:
+        return reports.sections(scope)
+    except Exception as e:
+        log.warning("herald could not read plugin report sections: %s", e)
+        return []
+
+
+def _plugin_facts(scope: str) -> dict[str, Any]:
+    """The same news as figures, so the lede can speak to it instead of ignoring it."""
+    from orion.core import reports
+    try:
+        return reports.facts(scope)
+    except Exception as e:
+        log.warning("herald could not read plugin report facts: %s", e)
+        return {}
+
+
 def _parse(ts: str | None) -> datetime | None:
     """Parse one of the several ISO shapes in the codebase; naive stamps are read as UTC."""
     if not ts:
@@ -211,6 +231,7 @@ async def morning_briefing() -> dict:
                         for r in failures],
         "world_model": stats,
         "cloud_spend_today_usd": spend["cost_usd"],
+        **_plugin_facts("briefing"),
     }
 
     sections: list[dict[str, Any]] = []
@@ -240,6 +261,8 @@ async def morning_briefing() -> dict:
             "bullets": [f"{r['label']}: {str(r.get('result'))[:160]}" for r in failures[:6]],
             "accent": render.IDEA,
         })
+    # whatever the other agents have to say for themselves (Maintainer's pull requests, ...)
+    sections.extend(_plugin_sections("briefing"))
     if stats:
         sections.append({
             "heading": "World model",
@@ -307,6 +330,7 @@ async def weekly_letter() -> dict:
         "world_model": stats,
         "cloud_spend_week_usd": spend["cost_usd"],
         "spend_by_model": {k: round(v, 4) for k, v in spend["by_model"].items()},
+        **_plugin_facts("weekly"),
     }
 
     sections: list[dict[str, Any]] = [
@@ -327,6 +351,7 @@ async def weekly_letter() -> dict:
                         for label, n in Counter(r["label"] for r in failures).most_common()],
             "accent": render.IDEA,
         })
+    sections.extend(_plugin_sections("weekly"))
     sections.append({
         "heading": "Cloud spend",
         "rows": ([("7 days", _money(spend["cost_usd"]))]
@@ -397,6 +422,26 @@ async def watch_alerts() -> dict:
                               "detail": "Cloud calls are paused until midnight; chat is "
                                         "answering from the local model only.",
                               "when": ""})
+
+        # a plugin's own trouble, on the same cooldown ledger: a Maintainer run that failed
+        # last night is one mail, and a source that says `resolved` re-arms its key.
+        from orion.core import reports
+        try:
+            contributed = reports.alerts()
+        except Exception as e:
+            log.warning("herald could not read plugin alerts: %s", e)
+            contributed = []
+        for item in contributed:
+            key = str(item.get("key") or "")
+            if not key:
+                continue
+            if item.get("resolved"):
+                store.clear_alert(c, key)
+                continue
+            if store.alert_due(c, key, cooldown):
+                fired.append({"key": key, "heading": item.get("heading", "Something needs you"),
+                              "detail": str(item.get("detail", ""))[:300],
+                              "when": item.get("when", "")})
 
         if not fired:
             return {"ok": True, "outcome": "quiet", "alerts": 0}

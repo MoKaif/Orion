@@ -21,6 +21,11 @@ services:
       # vault.path works both bare-metal and in-container. Read-write: Curator applies
       # user-approved grammar fixes here (backups land in ./data/curator_backups).
       - /home/nox/Nox:/home/nox/Nox
+      # The code Maintainer watches, mounted at the same path for the same reason — and
+      # READ-ONLY, which is the whole safety story: Orion reads every repo to propose work
+      # and is physically unable to change one. Writing is the host runner's job, and only
+      # ever inside its own worktrees (see scripts/maintainer_runner.py).
+      - /home/nox/Developing-Environment:/home/nox/Developing-Environment:ro
     environment:
       - PYTHONUNBUFFERED=1
       # Left unset on purpose: Orion applies settings.json's identity.timezone at startup, so

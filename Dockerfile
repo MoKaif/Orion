@@ -23,7 +23,11 @@ FROM python:3.13-slim-bookworm
 # wall-clock — without a tz database a 07:30 briefing fires at 13:00 IST. The zone itself
 # comes from settings.json (identity.timezone), applied at startup; this just makes the
 # names resolvable.
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl tzdata \
+# git: read-only, for Maintainer's nightly scan. It reads each project at origin/<base>
+# (`git show`, `git log`, `git grep`) rather than off the working tree, so a brief describes
+# the code a run will actually branch from. The workspace is mounted :ro — nothing here can
+# write to a repo; that is the host runner's job alone.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl tzdata git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

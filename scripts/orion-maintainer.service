@@ -1,0 +1,43 @@
+# Maintainer's host runner — the half of the agent that can actually write code.
+#
+# It runs as *you*, not as root and not in a container, because that is where the things it
+# needs already live: your Claude Code OAuth session in ~/.claude, your gh and ssh credentials,
+# node/pnpm/dotnet, and the repos themselves. Orion stays sealed and merely hands out work.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user ~/.config/orion
+#   cp scripts/orion-maintainer.service ~/.config/systemd/user/
+#   printf 'MAINTAINER_RUNNER_TOKEN=%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(32))')" \
+#       > ~/.config/orion/maintainer.env
+#   chmod 600 ~/.config/orion/maintainer.env
+#   # put the same token in Orion's gitignored config/secrets.json as MAINTAINER_RUNNER_TOKEN
+#   systemctl --user daemon-reload && systemctl --user enable --now orion-maintainer
+#   loginctl enable-linger $USER      # so it survives logout on a headless box
+#
+# Watch it:  journalctl --user -u orion-maintainer -f
+
+[Unit]
+Description=Orion Maintainer runner (claims approved work and runs Claude Code)
+Documentation=file:///home/nox/Developing-Environment/Orion-v2/CLAUDE.md
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/nox/Developing-Environment/Orion-v2
+EnvironmentFile=%h/.config/orion/maintainer.env
+Environment=ORION_URL=http://127.0.0.1:8020
+Environment=PATH=%h/.local/bin:%h/.npm-global/bin:%h/.dotnet/tools:/usr/local/bin:/usr/bin
+ExecStart=/usr/bin/python3 /home/nox/Developing-Environment/Orion-v2/scripts/maintainer_runner.py
+
+# Orion may be down, restarting, or mid-rebuild; the runner simply waits it out.
+Restart=always
+RestartSec=30
+
+# It writes to exactly two places: its own worktrees, and the repos' .git directories when it
+# fetches and pushes. Everything else on the system is read-only to it.
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

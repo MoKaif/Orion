@@ -10,6 +10,19 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.11.0] — 2026-08-03
+
+Maintainer proposes code changes and opens pull requests you review
+
+### Added
+- Maintainer agent (plugins/maintainer): reads your projects nightly, proposes work you approve in the inbox, then hands it to Claude Code on the host and opens a pull request. It never merges and never writes to a checkout you use.
+- scripts/maintainer_runner.py + orion-maintainer.service: a host-side runner that claims approved work over HTTP, runs Claude Code in a throwaway worktree, verifies with the repo's own build, and pushes a maintainer/* branch. Orion's container executes nothing.
+- orion/core/reports.py + plugin_sdk.add_report_source: a plugin can contribute sections, facts and alerts to another agent's letters without importing it.
+
+### Changed
+- Herald's briefing, weekly letter and alert watch now carry Maintainer's news — pull requests waiting, runs overnight, Claude time spent.
+- The workspace is bind-mounted read-only into the container and git is in the image, so the scan reads each repo at origin/<base> rather than off your working tree.
+
 ## [0.10.1] — 2026-08-01
 
 Background jobs run on your clock, not the container's

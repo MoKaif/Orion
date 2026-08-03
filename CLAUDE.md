@@ -192,7 +192,9 @@ defensively). Core ships **Conductor** (`maintenance.py` — consolidate + weekl
 Conductor because `orchestrator.py` already means the per-turn pipeline). The curator plugin ships
 **Curator** (its five passes + `knowledge`'s `index_vault`, which declares `agent="curator"`).
 There is no hardcoded job→agent map in core any more — the third agent, **Herald**
-(`plugins/herald/`, mail), was exactly one `add_agent` call and zero core changes.
+(`plugins/herald/`, mail), was exactly one `add_agent` call and zero core changes, and the
+fourth, **Maintainer** (`plugins/maintainer/`, code), needed one small core addition
+(`reports.py`) only because it had news for *Herald's* letters.
 
 - `ScheduledJob` carries `agent` · `label` · `description` · `limit_default`; unknown agent names
   fall back to the Conductor. `job_limit(name, default)` is read **at run time**, so a batch-size
@@ -261,6 +263,52 @@ never a drip). Own store: `data/herald.db` (WAL + 30 s busy_timeout like the Cur
   correct, since Gmail strips `<style>` and `class`, and CSS custom properties can't survive.
   Tables, not flexbox; inline styles only; `multipart/alternative` with a real text part.
 
+## Maintainer plugin (v1 done) — the first agent that changes code outside Orion
+
+`plugins/maintainer/` — reads your projects overnight, proposes work, and (once you approve the
+brief) hands the job to **Claude Code on the host**, which opens a pull request you review on
+GitHub. It exists because the local 3B model can't land a feature and DeepSeek isn't a coding
+agent with a filesystem — but `~/.local/bin/claude` already is, authenticated by the OAuth
+session in `~/.claude`, i.e. **billed to the subscription, not the $0 API account**.
+
+**Never merges, never writes to a checkout you use.** Every run branches from `origin/<base>`
+inside Maintainer's own worktree; the PR is the only output. `merge_pr` is in
+`constitution.IRREVERSIBLE_ACTIONS` and there is no merge code path at all.
+
+- **Split by tier**: DeepSeek proposes (`scan.py`, `Mode.REASONING`) · you approve in the inbox ·
+  Claude Code does the engineering · you review on GitHub. Nothing expensive runs unapproved.
+- **The container reads, the runner writes.** `docker-compose.yml` mounts
+  `/home/nox/Developing-Environment` **`:ro` at the same path** (the vault's trick), so Orion can
+  scan every repo and is incapable of modifying one. `git` is now in the image for that read.
+  All writing is `scripts/maintainer_runner.py` on the host — a `systemd --user` service
+  (`scripts/orion-maintainer.service`) that pulls work over HTTP like a CI runner. Orion never
+  execs anything; there is no docker socket and no credential inside the container.
+- **Scans the base branch, not your working tree.** FinStrive sits on a dirty feature branch and
+  ArcVe develops on `dev`, so `repos.py` reads through `git show origin/<base>:path` — what the
+  scan sees is exactly what a run will get. The Checkpoint notes `AGENT_REQUIREMENTS.md`
+  describes are **gitignored in 3 of 5 repos**, so they're read off disk as context while
+  `changelog_target()` only ever asks a run to edit a changelog that is actually tracked.
+- **Guards are code, not prompt**: `assert_safe()` refuses any worktree outside the configured
+  root, pushes are refused unless the branch is `maintainer/*`, never `--force`. The child env is
+  scrubbed of Orion's secrets — chiefly `ANTHROPIC_API_KEY`, whose presence would redirect
+  billing to the empty account. Never pass `--bare` (it forces API-key auth).
+- **A stalled run is observable**: a watchdog thread kills Claude at `max_run_minutes` (reading
+  stdout blocks, so a deadline checked in the read loop would never fire), a heartbeat flushes
+  every 60s, and `maintainer_sweep` reaps anything silent past that + 15 min.
+- **One core addition**: `orion/core/reports.py` + `plugin_sdk.add_report_source` — how a plugin
+  contributes sections/facts/alerts to *another* plugin's letter without importing it. Herald
+  folds them into the briefing, the weekly letter and its alert cooldown ledger.
+- Config: tracked `config/maintainer.json` (per-repo `base`/`install`/`verify`, + `.local.json`
+  overlay). `MAINTAINER_RUNNER_TOKEN` in gitignored `config/secrets.json` — **no token ⇒ the
+  runner protocol is closed**, which is the safe default since an open `/claim` is an RCE
+  primitive. `Orion-v2` is in the registry but `enabled: false` (self-improvement is v2).
+- API: `/plugins/maintainer/status` · `/tasks[/{id}]` · `/runs[/{id}]` · `/repos` · `POST /scan`;
+  runner protocol under `/runner/*` (bearer-guarded): `claim` · `runs/{id}/events` ·
+  `runs/{id}/result` · `prs`. Widget `maintainer_prs`; panels on `/agents/maintainer`.
+- Host prerequisite: **`gh`** (`pacman -S github-cli && gh auth login && gh auth setup-git`) —
+  it opens the PRs and makes the `https://` remotes pushable. Without it the branch still pushes
+  and the run reports honestly that no PR could be opened.
+
 ## Curator plugin (v1 done)
 
 `plugins/curator/` — the vault's resident editor, riding entirely on the SDK. A nightly
@@ -286,7 +334,8 @@ entity/place notes. (The old standalone Windows-era `Curator/` dir at repo root 
 ## Next: expansion (each is one plugin / one interface, no core work)
 
 Content plugins (`operations`/`finance`/`health`/`calendar`) and a Pi/voice client. See
-`docs/ROADMAP.md`.
+`docs/ROADMAP.md`. Maintainer v2: chat-initiated tasks (one `add_tool`), Orion self-improvement
+(flip `repos["Orion-v2"].enabled`), and iterating on PR review comments.
 
 **Cloud-brain hardening (done):** the cost core is now real. Prompt caching — the orchestrator
 splits the stable system prefix (constitution + specialist, sent as a `cache_control` block) from
