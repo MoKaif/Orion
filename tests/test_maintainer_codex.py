@@ -107,5 +107,32 @@ class NightlyAuditTests(unittest.IsolatedAsyncioTestCase):
             store._DB, store._READY = old_db, old_ready
 
 
+class MaintainerStoreMigrationTests(unittest.TestCase):
+    def test_old_missing_toolchain_failures_become_blocked(self):
+        old_db, old_ready = store._DB, store._READY
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                store._DB = Path(tmp) / "maintainer.db"
+                store._READY = False
+                c = store.conn()
+                task = store.add_task(c, "Example", "Task", "Brief")
+                first = store.start_run(c, task)
+                second = store.start_run(c, task)
+                c.execute("UPDATE runs SET verify='failed', verify_tail=? WHERE id=?",
+                          ("No .NET SDKs were found.", first))
+                c.execute("UPDATE runs SET verify='failed', verify_tail=? WHERE id=?",
+                          ("sh: line 1: next: command not found", second))
+                c.commit()
+                c.close()
+
+                store._READY = False
+                c = store.conn()
+                states = [r[0] for r in c.execute("SELECT verify FROM runs ORDER BY id")]
+                c.close()
+                self.assertEqual(states, ["blocked", "blocked"])
+        finally:
+            store._DB, store._READY = old_db, old_ready
+
+
 if __name__ == "__main__":
     unittest.main()

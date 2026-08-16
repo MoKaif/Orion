@@ -10,6 +10,13 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.11.3] — 2026-08-16
+
+Correct Maintainer verification history
+
+### Fixed
+- Migrate legacy missing-SDK and missing-dependency results to verification unavailable
+
 ## [0.11.2] — 2026-08-16
 
 Make Maintainer runs reliable

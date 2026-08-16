@@ -126,8 +126,8 @@ def _migrate(c: sqlite3.Connection) -> None:
     """Heal verification results that older runners mislabeled as build failures."""
     c.execute(
         "UPDATE runs SET verify='blocked' WHERE verify='failed' AND "
-        "(verify_tail LIKE '%No SDKs were found%' "
-        "OR verify_tail LIKE '%sh: line 1: next: not found%')")
+        "(verify_tail LIKE '%No .NET SDKs were found%' "
+        "OR verify_tail LIKE '%sh: line 1: next: command not found%')")
     c.commit()
 
 
