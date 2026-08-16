@@ -12,6 +12,10 @@ sqlite-vec            # in-process vector search, single file
 # Background scheduling (M3)
 croniter
 
+# Treasurer's optional personal-finance models. The plugin falls back to robust rolling
+# statistics when this is absent, so a lean/offline install still produces honest insights.
+scikit-learn
+
 # Cloud orchestrator (M-cloud) — Claude API brain for reasoning/deep-work turns.
 # Lazy-imported in providers/anthropic.py, so its absence degrades to local Ollama.
 anthropic

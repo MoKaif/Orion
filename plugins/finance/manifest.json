@@ -1,0 +1,24 @@
+{
+  "//": "Treasurer — learns personal spending baselines and explains material changes.",
+  "name": "finance",
+  "version": "1.0.0",
+  "specialists": ["finance"],
+  "agents": ["treasurer"],
+  "tools": ["finance_summary", "spending_breakdown", "finance_insights"],
+  "entity_types": ["financial_pattern", "financial_goal"],
+  "relationship_types": ["affects_spending"],
+  "background_jobs": [
+    { "name": "treasurer_refresh", "cron": "0 */4 * * *" },
+    { "name": "treasurer_analyze", "cron": "0 7 * * *" },
+    { "name": "treasurer_train", "cron": "30 6 * * 0" }
+  ],
+  "api_routes": [
+    "/plugins/finance/status",
+    "/plugins/finance/snapshot",
+    "/plugins/finance/insights",
+    "/plugins/finance/refresh",
+    "/plugins/finance/insights/{id}"
+  ],
+  "dashboard_widgets": ["treasurer_spending"],
+  "permissions": ["read_finstrive", "local_financial_models", "propose_financial_knowledge"]
+}
