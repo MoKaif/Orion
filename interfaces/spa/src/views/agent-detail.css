@@ -474,6 +474,34 @@
 }
 
 /* ---- Herald: the mail log --------------------------------------------- */
+
+/* ---- Treasurer: evidence before interpretation ----------------------- */
+.finance-strip { display: grid; grid-template-columns: repeat(4, 1fr); padding: 0; overflow: hidden; }
+.finance-number { padding: 18px; border-right: 1px solid var(--line); }
+.finance-number:last-child { border-right: 0; }
+.finance-number b { display: block; color: var(--fg); font-family: var(--mono); font-size: 18px; }
+.finance-number span { display: block; margin-top: 6px; color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.finance-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 12px; }
+.finance-panel { padding: 18px; }
+.finance-panel h3 { margin: 0 0 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.finance-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 12px; }
+.finance-row b { font-family: var(--mono); font-weight: 500; color: var(--fg); }
+.finance-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.finance-insight { padding: 18px; border-left: 2px solid var(--observation); }
+.finance-insight.fi-attention, .finance-insight.fi-critical { border-left-color: var(--idea); }
+.finance-insight header { display: flex; justify-content: space-between; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.finance-insight header b { color: var(--observation); }
+.finance-insight h3 { margin: 14px 0 6px; font-size: 14px; color: var(--fg); }
+.finance-insight p { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.finance-insight .finance-hypothesis { border-left: 1px solid var(--line); padding-left: 10px; }
+.finance-insight .finance-suggestion { color: var(--fg); }
+.finance-insight footer { margin-top: 14px; color: var(--faint); font-family: var(--mono); font-size: 10px; }
+@media (max-width: 760px) {
+  .finance-strip { grid-template-columns: repeat(2, 1fr); }
+  .finance-number:nth-child(2) { border-right: 0; }
+  .finance-number:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .finance-grid, .finance-insights { grid-template-columns: 1fr; }
+}
 /* A banner, not a toast: "Herald cannot send" is a standing condition until you add a
    key, and it must stay legible above the passes it explains. */
 .ap-blocked {

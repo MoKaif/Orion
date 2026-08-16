@@ -117,7 +117,11 @@ reference implementation.
 
 ## Beyond M5 — expansion (each item is one plugin / one interface, no core work)
 
-- [ ] Content plugins: `operations`, `finance`, `health`, `calendar` specialists + tools.
+- [ ] Content plugins: `operations`, `health`, `calendar` specialists + tools.
+- [x] **Treasurer / finance** (`plugins/finance/`) — reads FinStrive without changing it,
+      learns personal expected-spending ranges locally, detects category and transaction
+      anomalies, constrains LLM interpretation to computed evidence, and contributes findings
+      to chat, the Review Inbox, mission control, and Herald.
 - [ ] Raspberry Pi / voice client as another thin interface to the same backend.
 - [x] **Maintainer** (`plugins/maintainer/`) — the first agent that changes code outside Orion.
       DeepSeek reads each project overnight and proposes work; you approve the brief in the

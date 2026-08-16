@@ -1,0 +1,39 @@
+{
+  "//": "Treasurer — evidence-backed personal finance inference over FinStrive.",
+  "//2": "Machine-specific tuning belongs in treasurer.local.json. The service token belongs",
+  "//3": "in config/secrets.json as FINSTRIVE_TREASURER_TOKEN, never in this file.",
+  "enabled": true,
+  "finstrive": {
+    "base_url": "http://127.0.0.1:5101",
+    "transactions_path": "/api/transactions",
+    "token_env": "FINSTRIVE_TREASURER_TOKEN",
+    "timeout_seconds": 20
+  },
+  "analysis": {
+    "history_days": 400,
+    "baseline_weeks": 10,
+    "minimum_baseline_weeks": 4,
+    "minimum_category_spend_inr": 1000,
+    "minimum_change_inr": 750,
+    "spike_ratio": 1.35,
+    "critical_spike_ratio": 1.75,
+    "unusual_transaction_inr": 2500,
+    "stale_after_hours": 96,
+    "unknown_flow_ratio": 0.05,
+    "max_insights": 12
+  },
+  "ml": {
+    "enabled": true,
+    "minimum_daily_samples": 70,
+    "random_state": 42
+  },
+  "llm": {
+    "enabled": true,
+    "max_insights_per_run": 6,
+    "share_merchant_names": false
+  },
+  "alerts": {
+    "minimum_confidence": 0.72,
+    "severities": ["attention", "critical"]
+  }
+}

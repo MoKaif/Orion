@@ -100,5 +100,6 @@ still accepts any type, honouring "evolution over completion."
 | `knowledge` | Obsidian vault ingestion → notes/concepts; semantic index; `recent_discoveries` widget. |
 | `software` | `read_file`, `shell`; the software specialist. |
 | `research` | `web_search`; the research specialist. |
+| `finance` | Treasurer agent; FinStrive-derived personal models, finance chat tools, reviewable insights, and Herald reports. |
 
 Later, all as plugins with zero core changes: `operations`, `calendar`, `finance`, `health`.

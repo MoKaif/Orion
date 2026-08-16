@@ -14,6 +14,7 @@ import {
   Check,
   CircleAlert,
   GitPullRequest,
+  WalletCards,
   LucideIcon,
 } from "lucide-react";
 import {
@@ -36,7 +37,11 @@ const ICONS: Record<string, LucideIcon> = {
   mail: Mail,
   bot: Bot,
   "git-pull-request": GitPullRequest,
+  "wallet-cards": WalletCards,
 };
+
+const inr = (n: number) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 
 /** A run's one-line verdict: the diffstat when it stands up, the reason when it doesn't. */
 function runVerdict(r: MaintainerRun) {
@@ -224,6 +229,10 @@ export default function AgentDetail() {
   const queue = (data.queue ?? []).filter((t) => t.status === "proposed");
   const prs = data.prs ?? [];
   const codeRuns = data.runs ?? [];
+  const treasurer = data.treasurer;
+  const finance = data.finance_snapshot;
+  const financeInsights = data.finance_insights ?? [];
+  const financeModel = data.finance_model;
   const threshold = data.hub_threshold ?? 3;
   const Icon = ICONS[agent.icon] ?? Bot;
   const metrics = summary.metrics ?? [];
@@ -291,6 +300,73 @@ export default function AgentDetail() {
           <CircleAlert size={14} /> {maintainer.reason} Until then Maintainer can read your
           projects and propose work, but nothing can be built.
         </p>
+      )}
+
+      {treasurer && !treasurer.ok && (
+        <p className="ap-blocked ap-note">
+          <CircleAlert size={14} /> Treasurer is using its last safe state — {treasurer.reason}
+        </p>
+      )}
+
+      {finance && (
+        <>
+          <h2 className="ap-section">
+            What it sees <span className="count-pill">{finance.transaction_count} transactions</span>
+            <span className="ap-section-note">read-only from FinStrive</span>
+          </h2>
+          <section className="finance-strip card">
+            {[
+              ["Spent · 7 days", finance.periods.last_7d?.spending ?? 0],
+              ["Income · MTD", finance.periods.month_to_date?.income ?? 0],
+              ["Invested · MTD", finance.periods.month_to_date?.investing ?? 0],
+              ["Net · MTD", finance.periods.month_to_date?.net ?? 0],
+            ].map(([label, value]) => (
+              <div className="finance-number" key={String(label)}>
+                <b>{inr(Number(value))}</b><span>{label}</span>
+              </div>
+            ))}
+          </section>
+
+          <div className="finance-grid">
+            <section className="card finance-panel">
+              <h3>Month-to-date categories</h3>
+              {Object.entries(finance.categories_month_to_date)
+                .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([category, value]) => (
+                  <div className="finance-row" key={category}>
+                    <span>{category}</span><i className="leader"/><b>{inr(value)}</b>
+                  </div>
+                ))}
+            </section>
+            <section className="card finance-panel">
+              <h3>Model evidence</h3>
+              <div className="finance-row"><span>method</span><i className="leader"/><b>{financeModel?.method ?? "robust baseline"}</b></div>
+              <div className="finance-row"><span>samples</span><i className="leader"/><b>{financeModel?.samples ?? "—"}</b></div>
+              <div className="finance-row"><span>unmapped</span><i className="leader"/><b>{finance.quality.unmapped_count}</b></div>
+              <div className="finance-row"><span>unknown flow</span><i className="leader"/><b>{finance.quality.unknown_flow_count}</b></div>
+              <p className="registry-hint">Models detect the change. The LLM explains only figures already established here.</p>
+            </section>
+          </div>
+        </>
+      )}
+
+      {financeInsights.length > 0 && (
+        <>
+          <h2 className="ap-section">
+            Current inferences <span className="count-pill alert">{financeInsights.length}</span>
+            <Link to="/inbox" className="btn btn-sm btn-ghost ap-section-act">review in inbox <ExternalLink size={12}/></Link>
+          </h2>
+          <div className="finance-insights">
+            {financeInsights.map((item) => (
+              <article className={`card finance-insight fi-${item.severity}`} key={item.id}>
+                <header><span>{item.kind.replaceAll("_", " ")}</span><b>{Math.round(item.confidence * 100)}% confidence</b></header>
+                <h3>{item.title}</h3><p>{item.detail}</p>
+                {item.llm?.hypothesis && <p className="finance-hypothesis"><b>Hypothesis:</b> {item.llm.hypothesis}</p>}
+                {item.llm?.suggestion && <p className="finance-suggestion">{item.llm.suggestion}</p>}
+                <footer>{item.method} · {item.review_state}</footer>
+              </article>
+            ))}
+          </div>
+        </>
       )}
 
       <h2 className="ap-section">

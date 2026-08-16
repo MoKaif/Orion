@@ -224,6 +224,60 @@ export interface MaintainerRepo {
   enabled: boolean;
 }
 
+export interface TreasurerStatus {
+  ok: boolean;
+  state: "ready" | "cached" | "waiting";
+  reason: string;
+  source: string;
+  cached_at: string | null;
+  latest_transaction_at: string | null;
+  active_insights: number;
+}
+
+export interface FinanceFigures {
+  income: number;
+  spending: number;
+  investing: number;
+  refunds: number;
+  net: number;
+  savings_rate: number | null;
+}
+
+export interface FinanceSnapshot {
+  as_of: string;
+  cached_at: string;
+  latest_transaction_at: string | null;
+  transaction_count: number;
+  quality: { unmapped_count: number; unknown_flow_count: number; unknown_flow_ratio: number };
+  periods: Record<string, FinanceFigures>;
+  categories_last_7d: Record<string, number>;
+  categories_month_to_date: Record<string, number>;
+  recurring: { merchant: string; amount: number; last_seen: string; payments: number }[];
+}
+
+export interface FinanceInsight {
+  id: number;
+  kind: string;
+  scope: string;
+  title: string;
+  detail: string;
+  confidence: number;
+  severity: string;
+  method: string;
+  review_state: string;
+  first_seen_at: string;
+  evidence: Record<string, unknown>;
+  llm?: { hypothesis?: string | null; suggestion?: string | null } | null;
+}
+
+export interface FinanceModel {
+  method: string;
+  samples: number;
+  trained_through: string | null;
+  metrics: { available?: boolean; validation_mae?: number; interval?: number[] };
+  created_at: string;
+}
+
 /** An agent's own page. The optional panels are contributed by the agent itself. */
 export interface AgentDetail {
   agent: AgentIdentity;
@@ -241,6 +295,10 @@ export interface AgentDetail {
   prs?: MaintainerRun[];
   runs?: MaintainerRun[];
   repos?: MaintainerRepo[];
+  treasurer?: TreasurerStatus;
+  finance_snapshot?: FinanceSnapshot;
+  finance_insights?: FinanceInsight[];
+  finance_model?: FinanceModel | null;
 }
 
 export interface JobPatch {
@@ -364,6 +422,8 @@ export function useResolveInbox() {
         // a brief: approve|reject. Approving only queues the work for the host runner —
         // the pull request it opens is still yours to merge or close.
         await postForm(`/plugins/maintainer/tasks/${item.id}`, { action });
+      } else if (item.origin === "treasurer") {
+        await postForm(`/plugins/finance/insights/${item.id}`, { action });
       } else {
         await postForm(`/reviews/${item.id}`, { action });
       }
