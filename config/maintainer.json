@@ -47,13 +47,17 @@
       "install": "npm --prefix frontend ci",
       "install_marker": "frontend/node_modules",
       "verify": "dotnet build api/api.csproj -v q",
+      "verify_by_path": {
+        "frontend/": "CI=true npm --prefix frontend test -- --watchAll=false",
+        "api/": "dotnet build api/api.csproj -v q"
+      },
       "enabled": true
     },
     "ArcVe": {
       "path": "ArcVe/ArcVe",
       "base": "main",
       "blurb": "Gaming documentation / library dashboard, deployed on Vercel.",
-      "install": "npm ci",
+      "install": "pnpm install --frozen-lockfile",
       "install_marker": "node_modules",
       "verify": "npm run build",
       "enabled": true

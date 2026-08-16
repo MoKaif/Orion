@@ -28,6 +28,7 @@ Run it as a systemd --user service (see the unit shipped alongside this file):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -54,7 +55,8 @@ _SCRUB = ("ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "OPENAI_API
 
 _BRANCH_PREFIX = "maintainer/"
 #: Kept between runs so `npm ci` is paid for once per repo, not once per task.
-_KEEP_ON_CLEAN = ("node_modules", ".next", "dist", "bin", "obj", "venv", ".venv")
+_KEEP_ON_CLEAN = ("node_modules", ".next", "dist", "bin", "obj", "venv", ".venv",
+                  )
 
 
 def log(msg: str) -> None:
@@ -176,13 +178,40 @@ def prepare(job: dict[str, Any], feed: Feed) -> Path:
 def install_if_needed(job: dict[str, Any], wt: Path, feed: Feed) -> None:
     repo = job["repo"]
     cmd, marker = repo.get("install"), repo.get("install_marker")
-    if not cmd or (marker and (wt / marker).exists()):
+    if not cmd:
+        return
+    fingerprint = _install_fingerprint(wt, str(cmd))
+    stamp = _install_stamp(wt)
+    try:
+        installed = json.loads(stamp.read_text()).get("fingerprint") == fingerprint
+    except (OSError, json.JSONDecodeError, AttributeError):
+        installed = False
+    if installed and (not marker or (wt / marker).exists()):
         return
     minutes = float((job.get("runner") or {}).get("install_minutes", 20) or 20)
     feed.add("step", f"installing dependencies: {cmd}")
     code, out = run(cmd, wt, timeout=int(minutes * 60))
     if code != 0:
-        feed.add("error", f"dependency install failed: {out.strip()[-400:]}")
+        raise RuntimeError(f"dependency install failed: {out.strip()[-400:]}")
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(json.dumps({"fingerprint": fingerprint, "command": cmd}))
+
+
+def _install_stamp(wt: Path) -> Path:
+    """Dependency state outside the worktree, where ``git add -A`` can never publish it."""
+    return wt.parent.parent / "state" / f"{wt.name}-install.json"
+
+
+def _install_fingerprint(wt: Path, command: str) -> str:
+    """Hash the install command and lockfiles so cached dependencies cannot be half-installed."""
+    digest = hashlib.sha256(command.encode())
+    for name in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "requirements.txt",
+                 "frontend/package-lock.json", "frontend/pnpm-lock.yaml"):
+        path = wt / name
+        if path.is_file():
+            digest.update(name.encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 # -- the prompt ------------------------------------------------------------
@@ -361,17 +390,55 @@ def diffstat(wt: Path) -> dict[str, int]:
     return {"files_changed": files, "insertions": ins, "deletions": dels}
 
 
-def verify(job: dict[str, Any], wt: Path, feed: Feed) -> tuple[str, str]:
-    cmd = (job["repo"].get("verify") or "").strip()
-    if not cmd:
+def changed_paths(wt: Path) -> list[str]:
+    _, raw = git(wt, "diff", "--cached", "--name-only")
+    return [line.strip() for line in raw.splitlines() if line.strip()]
+
+
+def verification_commands(repo: dict[str, Any], paths: list[str]) -> list[str]:
+    """Choose verification for the code that actually changed, ignoring documentation."""
+    code_paths = [p for p in paths if not p.lower().endswith((".md", ".txt", ".rst"))]
+    if not code_paths:
+        return []
+    rules = repo.get("verify_by_path") or {}
+    commands = []
+    unmatched = []
+    for path in code_paths:
+        matches = [str(cmd).strip() for prefix, cmd in rules.items()
+                   if path.startswith(prefix) and str(cmd).strip()]
+        if matches:
+            for cmd in matches:
+                if cmd not in commands:
+                    commands.append(cmd)
+        else:
+            unmatched.append(path)
+    fallback = str(repo.get("verify") or "").strip()
+    if (unmatched or not commands) and fallback and fallback not in commands:
+        commands.append(fallback)
+    return commands
+
+
+def verify(job: dict[str, Any], wt: Path, feed: Feed,
+           paths: list[str]) -> tuple[str, str]:
+    commands = verification_commands(job["repo"], paths)
+    if not commands:
         return "skipped", ""
     minutes = float((job.get("runner") or {}).get("max_run_minutes", 45) or 45)
-    feed.add("step", f"verifying: {cmd}")
-    code, out = run(cmd, wt, timeout=int(minutes * 60))
-    tail = out.strip()[-1500:]
-    feed.add("step" if code == 0 else "error",
-             "verification passed" if code == 0 else f"verification failed: {tail[-300:]}")
-    return ("passed" if code == 0 else "failed"), tail
+    tails = []
+    for cmd in commands:
+        feed.add("step", f"verifying: {cmd}")
+        code, out = run(cmd, wt, timeout=int(minutes * 60))
+        tail = out.strip()[-1500:]
+        tails.append(f"$ {cmd}\n{tail}")
+        if code != 0:
+            unavailable = (code == 127 or "No SDKs were found" in out
+                           or "command not found" in out)
+            status = "blocked" if unavailable else "failed"
+            label = "verification unavailable" if unavailable else "verification failed"
+            feed.add("error", f"{label}: {tail[-300:]}")
+            return status, "\n\n".join(tails)[-3000:]
+    feed.add("step", "verification passed")
+    return "passed", "\n\n".join(tails)[-3000:]
 
 
 def publish(job: dict[str, Any], wt: Path, feed: Feed, summary: str,
@@ -461,7 +528,8 @@ def handle(job: dict[str, Any]) -> None:
                             "summary": (outcome["summary"] or "No change was needed.")})
             return
 
-        verdict, tail = verify(job, wt, feed)
+        paths = changed_paths(wt)
+        verdict, tail = verify(job, wt, feed, paths)
         outcome.update({"verify": verdict, "verify_tail": tail})
         outcome.update(publish(job, wt, feed, outcome["summary"], verdict, tail))
         outcome["ok"] = True

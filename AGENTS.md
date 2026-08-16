@@ -34,6 +34,9 @@ host-side `scripts/maintainer_runner.py` invokes `codex exec` in a dedicated wor
 the result, pushes only a `maintainer/*` branch, and opens a pull request. It never merges and
 must never write in a user's normal checkout. Codex uses the host's saved CLI authentication;
 provider API keys are deliberately removed from its child environment.
+Dependency installation must complete successfully before Codex starts. Verification is chosen
+from the paths actually changed; unavailable host toolchains are reported as blocked rather than
+as code failures.
 
 ## Curator
 

@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS runs (
     turns INTEGER NOT NULL DEFAULT 0,
     cost_usd REAL NOT NULL DEFAULT 0.0,
     duration_s REAL NOT NULL DEFAULT 0.0,
-    verify TEXT NOT NULL DEFAULT 'skipped',  -- passed | failed | skipped
+    verify TEXT NOT NULL DEFAULT 'skipped',  -- passed | failed | blocked | skipped
     verify_tail TEXT NOT NULL DEFAULT '',
     summary TEXT NOT NULL DEFAULT '',        -- Codex's own account of what it did
     error TEXT,
@@ -117,8 +117,18 @@ def conn() -> sqlite3.Connection:
     c.execute("PRAGMA synchronous = NORMAL")
     if not _READY:
         c.executescript(_SCHEMA)
+        _migrate(c)
         _READY = True
     return c
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Heal verification results that older runners mislabeled as build failures."""
+    c.execute(
+        "UPDATE runs SET verify='blocked' WHERE verify='failed' AND "
+        "(verify_tail LIKE '%No SDKs were found%' "
+        "OR verify_tail LIKE '%sh: line 1: next: not found%')")
+    c.commit()
 
 
 def slugify(title: str) -> str:

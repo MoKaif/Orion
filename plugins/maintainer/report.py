@@ -96,6 +96,8 @@ def _verdict(pr: dict[str, Any]) -> str:
     """One word on whether the branch stands up, so the row is worth reading on a phone."""
     if pr["verify"] == "failed":
         return "build failed"
+    if pr["verify"] == "blocked":
+        return "verification unavailable"
     if pr["verify"] == "passed":
         return f"+{pr['insertions']}/-{pr['deletions']}"
     return f"{pr['files_changed']} files"

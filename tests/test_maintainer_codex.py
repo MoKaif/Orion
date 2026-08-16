@@ -40,6 +40,37 @@ class MaintainerCodexTests(unittest.TestCase):
         self.assertEqual(result["turns"], 1)
         self.assertIn(("text", "Implemented the fix."), feed.items)
 
+    def test_failed_dependency_install_stops_the_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wt = Path(tmp) / "wt" / "Example"
+            wt.mkdir(parents=True)
+            job = {"repo": {"install": "npm ci", "install_marker": "node_modules"},
+                   "runner": {"install_minutes": 1}}
+            with patch.object(runner, "run", return_value=(1, "lockfile mismatch")):
+                with self.assertRaisesRegex(RuntimeError, "dependency install failed"):
+                    runner.install_if_needed(job, wt, FakeFeed())
+            self.assertFalse(runner._install_stamp(wt).exists())
+
+    def test_verification_is_selected_from_changed_paths(self):
+        repo = {
+            "verify": "dotnet build api/api.csproj",
+            "verify_by_path": {
+                "frontend/": "npm --prefix frontend test",
+                "api/": "dotnet build api/api.csproj",
+            },
+        }
+        self.assertEqual(
+            runner.verification_commands(repo, ["frontend/src/App.test.tsx", "CHANGELOG.md"]),
+            ["npm --prefix frontend test"])
+        self.assertEqual(runner.verification_commands(repo, ["README.md"]), [])
+
+    def test_missing_sdk_is_verification_blocked_not_build_failed(self):
+        job = {"repo": {"verify": "dotnet build api/api.csproj"},
+               "runner": {"max_run_minutes": 1}}
+        with patch.object(runner, "run", return_value=(145, "No SDKs were found.")):
+            status, _ = runner.verify(job, Path("/tmp"), FakeFeed(), ["api/Program.cs"])
+        self.assertEqual(status, "blocked")
+
 
 class NightlyAuditTests(unittest.IsolatedAsyncioTestCase):
     async def test_unchanged_repository_is_still_audited(self):

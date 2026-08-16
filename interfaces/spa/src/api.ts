@@ -196,7 +196,7 @@ export interface MaintainerRun {
   turns: number;
   cost_usd: number;
   duration_s: number;
-  /** passed | failed | skipped — whether the repo's own build agreed. */
+  /** passed | failed | blocked | skipped — whether configured verification could run/pass. */
   verify: string;
   summary: string;
   error: string | null;

@@ -10,6 +10,16 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.11.2] — 2026-08-16
+
+Make Maintainer runs reliable
+
+### Fixed
+- Stop runs when dependency installation fails and cache only complete installs
+- Select verification from changed paths instead of unrelated project toolchains
+- Report unavailable toolchains separately from code build failures
+- Restore purple-buccaneers fetches through its HTTPS remote
+
 ## [0.11.1] — 2026-08-16
 
 Fix Curator and automate Maintainer audits

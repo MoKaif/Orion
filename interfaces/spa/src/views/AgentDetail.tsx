@@ -42,6 +42,7 @@ const ICONS: Record<string, LucideIcon> = {
 function runVerdict(r: MaintainerRun) {
   if (r.status === "failed") return { tone: "failed", text: r.error || "failed" };
   if (r.verify === "failed") return { tone: "failed", text: "build failed" };
+  if (r.verify === "blocked") return { tone: "idle", text: "verification unavailable" };
   if (r.files_changed === 0) return { tone: "idle", text: "no change needed" };
   return { tone: "ok", text: `+${r.insertions} −${r.deletions} in ${r.files_changed} files` };
 }
