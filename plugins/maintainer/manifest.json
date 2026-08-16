@@ -1,9 +1,9 @@
 {
   "//": "Maintainer — proposes code changes to the user's projects and opens pull requests.",
   "//2": "Reads repos through a read-only mount; all writing happens on the host, in",
-  "//3": "scripts/maintainer_runner.py, inside throwaway worktrees. It never merges.",
+  "//3": "scripts/maintainer_runner.py, where Codex uses throwaway worktrees. It never merges.",
   "name": "maintainer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "specialists": [],
   "agents": ["maintainer"],
   "tools": [],

@@ -11,7 +11,7 @@ refresh the index and would fail on a read-only tree.
 files; ArcVe develops on ``dev``. A brief drafted from whatever happens to be checked out would
 describe code the run will never see, because every run branches from ``origin/<base>``. So
 every read goes through git at that same ref — ``git show origin/main:README.md``, not
-``open("README.md")``. What the scan reads is exactly what Claude will get.
+``open("README.md")``. What the scan reads is exactly what Codex will get.
 
 Git is a read dependency of the container now (added to the Dockerfile). If it is missing this
 degrades to "no facts", the scan proposes nothing, and nothing crashes.
@@ -107,6 +107,63 @@ def tree(repo: dict[str, Any], limit: int = 60) -> list[str]:
     return [line for line in raw.splitlines() if line][:limit]
 
 
+_SOURCE_EXTS = {".cs", ".go", ".java", ".js", ".jsx", ".md", ".py", ".rs", ".ts", ".tsx"}
+
+
+def files(repo: dict[str, Any], limit: int = 500) -> list[str]:
+    """Tracked, human-authored files available for a rotating nightly audit."""
+    raw = _git(repo["root"], "ls-tree", "-r", "--name-only", f"origin/{repo['base']}")
+    skip = scan_cfg().get("skip") or []
+    out = []
+    for path in raw.splitlines():
+        if Path(path).suffix.lower() not in _SOURCE_EXTS:
+            continue
+        if any(part and part in path for part in skip):
+            continue
+        out.append(path)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def source_sample(repo: dict[str, Any], focus: str, limit: int = 5) -> dict[str, str]:
+    """Small source excerpts ranked for this night's audit lens.
+
+    Reading a few real implementation files lets an unchanged repository still reveal useful
+    work. The scan remains bounded: Codex only runs after approval, and the cheap proposer sees
+    at most ``limit`` excerpts here.
+    """
+    paths = files(repo)
+    keywords = {
+        "correctness": ("parser", "service", "store", "engine", "core", "api"),
+        "tests": ("test", "spec", "parser", "service", "core"),
+        "reliability": ("error", "client", "api", "service", "store", "worker", "runner"),
+        "maintainability": ("core", "service", "util", "helper", "manager", "engine"),
+        "documentation": ("readme", "docs/", "agents.md", "config", "manifest"),
+    }.get(focus, ())
+
+    def rank(path: str) -> tuple[int, int, int, str]:
+        lower = path.lower()
+        keyword_rank = next((i for i, word in enumerate(keywords) if word in lower), len(keywords))
+        low_signal = 0
+        if focus != "documentation":
+            low_signal += 3 if lower.endswith(".md") else 0
+            low_signal += 2 if any(part in lower for part in
+                                   ("/interfaces/", "/dto/", "/types/", ".d.ts")) else 0
+            low_signal += 1 if focus != "tests" and any(part in lower for part in
+                                                         ("/test/", "/tests/", ".test.", ".spec.")) else 0
+        # Prefer shallower files when no focus keyword distinguishes them; they tend to be
+        # entry points and are more informative than a random deeply nested implementation.
+        return low_signal, keyword_rank, lower.count("/"), lower
+
+    sample = {}
+    for path in sorted(paths, key=rank)[:limit]:
+        content = show(repo, path, 2200)
+        if content:
+            sample[path] = content
+    return sample
+
+
 #: Lockfiles and bundles are full of base64 that matches any loose marker pattern — an early
 #: run came back with npm integrity hashes because "XXX" appears inside sha512 blobs.
 _GREP_EXCLUDE = (":!*lock*", ":!*.min.*", ":!*.map", ":!*.svg", ":!dist/*", ":!.next/*")
@@ -165,7 +222,8 @@ def _tracked(repo: dict[str, Any], relpath: str) -> bool:
     return bool(out.strip())
 
 
-def digest(repo: dict[str, Any], since_sha: str | None = None) -> dict[str, Any]:
+def digest(repo: dict[str, Any], since_sha: str | None = None, *, focus: str = "correctness",
+           previous_tasks: list[str] | None = None) -> dict[str, Any]:
     """Everything the brief-drafting model is allowed to see about one repo.
 
     Facts only. The model shapes these into proposals; it is never asked to recall a repo it
@@ -176,6 +234,7 @@ def digest(repo: dict[str, Any], since_sha: str | None = None) -> dict[str, Any]
         "repo": repo["name"],
         "blurb": repo.get("blurb", ""),
         "base_branch": repo["base"],
+        "audit_focus": focus,
         "top_level": tree(repo),
         "readme": show(repo, "README.md", 3000),
         # the Checkpoint notes are gitignored in most of these projects; read them off disk
@@ -184,6 +243,9 @@ def digest(repo: dict[str, Any], since_sha: str | None = None) -> dict[str, Any]
                              or show(repo, "CHANGELOG.md", 2000)),
         "recent_commits": log_since(repo, since_sha, int(cfg.get("commits", 25) or 25)),
         "todo_markers": todos(repo, int(cfg.get("todo_hits", 20) or 20)),
-        "has_claude_md": bool(show(repo, "CLAUDE.md", 1)),
+        "source_excerpts": source_sample(
+            repo, focus, int(cfg.get("source_files", 5) or 5)),
+        "recently_considered_tasks": previous_tasks or [],
+        "has_agent_instructions": bool(show(repo, "AGENTS.md", 1) or show(repo, "CLAUDE.md", 1)),
         "changelog_to_update": changelog_target(repo),
     }

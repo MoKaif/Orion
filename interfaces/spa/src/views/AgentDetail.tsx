@@ -476,7 +476,7 @@ export default function AgentDetail() {
               ))}
             </ul>
             <p className="registry-hint">
-              Nothing here has run. Approving one hands it to Claude Code on your own machine, in
+              Nothing here has run. Approving one hands it to Codex on your own machine, in
               a throwaway worktree, and opens a pull request you review on GitHub.
             </p>
           </div>

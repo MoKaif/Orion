@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Maintainer's hands: the host-side worker that actually runs Claude Code.
+"""Maintainer's hands: the host-side worker that actually runs Codex.
 
 Orion runs in a container with a read-only view of your projects and no git, no gh and no
-claude. That is deliberate — the thing that decides what work is worth doing has no ability to
+Codex. That is deliberate — the thing that decides what work is worth doing has no ability to
 do it. This script is the other half: it runs on the host as you, claims approved work from
 Orion over HTTP, and does the engineering where the tools and your credentials already live.
 
-    claim  ->  worktree  ->  claude -p  ->  verify  ->  commit  ->  push  ->  gh pr create
+    claim  ->  worktree  ->  codex exec  ->  verify  ->  commit  ->  push  ->  gh pr create
 
 Four rules it enforces in code, not in a prompt:
 
@@ -15,9 +15,8 @@ Four rules it enforces in code, not in a prompt:
     even visited. Every run starts from `origin/<base>`.
   * It only ever pushes branches named `maintainer/*`, never with --force, never to a base
     branch. There is no code path here that merges anything.
-  * Anthropic credentials come from your Claude Code OAuth session in ~/.claude. Orion's own
-    secrets — including ANTHROPIC_API_KEY, whose account has no credit — are scrubbed from the
-    child environment, so a stray key cannot silently redirect billing or fail the run.
+  * Codex reuses the host's saved CLI authentication. Orion's provider keys are scrubbed from
+    the child environment so repository commands cannot inherit unrelated credentials.
   * A heartbeat goes up with every progress batch. If this process dies, Orion's sweep marks
     the run failed within the quarter hour instead of leaving it in flight forever.
 
@@ -46,10 +45,10 @@ TOKEN = os.environ.get("MAINTAINER_RUNNER_TOKEN", "")
 RUNNER = os.environ.get("MAINTAINER_RUNNER_NAME") or platform.node() or "host"
 POLL_SECONDS = float(os.environ.get("MAINTAINER_POLL_SECONDS", "20"))
 
-#: Never handed to Claude Code. ANTHROPIC_API_KEY matters most: Orion keeps one for a provider
-#: that is disabled on a $0 account, and its presence would override the OAuth session that
-#: actually pays for these runs.
+#: Never handed to Codex or the repository commands it starts. Codex uses the saved CLI login;
+#: an explicit API key would both change billing and become visible to untrusted build steps.
 _SCRUB = ("ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY",
+          "CODEX_API_KEY",
           "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "GMAIL_SENDER_ADDRESS",
           "GMAIL_SENDER_APP_PASSWORD", "MAINTAINER_RUNNER_TOKEN")
 
@@ -230,29 +229,26 @@ def build_prompt(job: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-# -- driving Claude Code ---------------------------------------------------
+# -- driving Codex --------------------------------------------------------
 def child_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in _SCRUB}
-    env["CLAUDE_CODE_ENTRYPOINT"] = "orion-maintainer"
-    return env
+    return {k: v for k, v in os.environ.items() if k not in _SCRUB}
 
 
-def run_claude(job: dict[str, Any], wt: Path, feed: Feed) -> dict[str, Any]:
-    """Drive one headless Claude Code session, streaming its progress up to Orion.
-
-    Never pass --bare: it forces ANTHROPIC_API_KEY auth and would bill an account with no
-    credit instead of using the OAuth session that pays for interactive Claude Code.
-    """
-    cfg = job.get("claude") or {}
+def run_codex(job: dict[str, Any], wt: Path, feed: Feed) -> dict[str, Any]:
+    """Drive one non-interactive Codex session, streaming its JSONL progress to Orion."""
+    cfg = job.get("codex") or {}
     minutes = float((job.get("runner") or {}).get("max_run_minutes", 45) or 45)
     cmd = [
-        cfg.get("bin", "claude"), "-p", build_prompt(job),
-        "--output-format", "stream-json", "--verbose",
-        "--permission-mode", cfg.get("permission_mode", "acceptEdits"),
-        "--model", str(cfg.get("model", "sonnet")),
-        "--max-turns", str(int(cfg.get("max_turns", 40) or 40)),
+        cfg.get("bin", "codex"), "exec", "--json", "--ephemeral",
+        "--sandbox", cfg.get("sandbox", "workspace-write"),
     ]
-    feed.add("step", f"handing the task to claude ({cfg.get('model', 'sonnet')})")
+    if cfg.get("model"):
+        cmd += ["--model", str(cfg["model"])]
+    if cfg.get("reasoning_effort"):
+        cmd += ["--config", f'model_reasoning_effort="{cfg["reasoning_effort"]}"']
+    cmd.append(build_prompt(job))
+    model = cfg.get("model") or "CLI default"
+    feed.add("step", f"handing the task to Codex ({model})")
 
     started = time.time()
     result: dict[str, Any] = {"turns": 0, "cost_usd": 0.0, "summary": "", "error": None}
@@ -260,7 +256,7 @@ def run_claude(job: dict[str, Any], wt: Path, feed: Feed) -> dict[str, Any]:
         proc = subprocess.Popen(cmd, cwd=str(wt), stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, env=child_env())
     except OSError as e:
-        result["error"] = f"could not start claude: {e}"
+        result["error"] = f"could not start Codex: {e}"
         return result
 
     # Two daemons, because reading stdout blocks: a watchdog that can actually end a stalled
@@ -300,15 +296,15 @@ def run_claude(job: dict[str, Any], wt: Path, feed: Feed) -> dict[str, Any]:
 
     result["duration_s"] = round(time.time() - started, 1)
     if timed_out.is_set():
-        result["error"] = f"claude ran past its {minutes:.0f} minute limit and was stopped"
+        result["error"] = f"Codex ran past its {minutes:.0f} minute limit and was stopped"
     elif result.get("error") is None and proc.returncode not in (0, None):
-        result["error"] = f"claude exited {proc.returncode}: {stderr.strip()[-400:]}"
+        result["error"] = f"Codex exited {proc.returncode}: {stderr.strip()[-400:]}"
     feed.flush()
     return result
 
 
 def _consume(line: str, feed: Feed, result: dict[str, Any]) -> None:
-    """Turn one stream-json line into a progress event and, at the end, the run's accounting."""
+    """Turn one Codex JSONL event into progress and final run accounting."""
     line = line.strip()
     if not line:
         return
@@ -317,30 +313,39 @@ def _consume(line: str, feed: Feed, result: dict[str, Any]) -> None:
     except json.JSONDecodeError:
         return
 
-    kind = msg.get("type")
-    if kind == "assistant":
-        for block in (msg.get("message") or {}).get("content") or []:
-            if block.get("type") == "text" and block.get("text", "").strip():
-                feed.add("text", block["text"].strip())
-            elif block.get("type") == "tool_use":
-                feed.add("tool", f"{block.get('name', 'tool')} {_tool_hint(block.get('input'))}")
-    elif kind == "result":
-        result["turns"] = int(msg.get("num_turns") or 0)
-        result["cost_usd"] = float(msg.get("total_cost_usd") or 0.0)
-        result["summary"] = str(msg.get("result") or "")[:4000]
-        if msg.get("is_error"):
-            result["error"] = str(msg.get("result") or msg.get("subtype") or "claude reported an error")[:400]
-        feed.add("step", f"claude finished after {result['turns']} turns")
+    kind = str(msg.get("type") or "")
+    item = msg.get("item") if isinstance(msg.get("item"), dict) else {}
+    item_type = str(item.get("type") or "")
+
+    if kind == "item.completed" and item_type == "agent_message":
+        text = str(item.get("text") or "").strip()
+        if text:
+            result["summary"] = text[:4000]
+            feed.add("text", text)
+    elif kind == "item.started" and item_type == "command_execution":
+        feed.add("tool", str(item.get("command") or "command")[:200])
+    elif kind == "item.completed" and item_type in ("file_change", "mcp_tool_call", "web_search"):
+        feed.add("tool", _codex_item_hint(item))
+    elif kind == "turn.completed":
+        result["turns"] = int(result.get("turns") or 0) + 1
+        feed.add("step", f"Codex finished after {result['turns']} turn(s)")
+    elif kind in ("turn.failed", "error"):
+        detail = msg.get("error") or msg.get("message") or item.get("text") or kind
+        result["error"] = str(detail)[:400]
+        feed.add("error", result["error"])
 
 
-def _tool_hint(payload: Any) -> str:
-    """A few words about what a tool call was for — enough to follow along, never a payload."""
-    if not isinstance(payload, dict):
-        return ""
-    for key in ("file_path", "path", "command", "pattern", "query", "url"):
-        if payload.get(key):
-            return str(payload[key])[:120]
-    return ""
+def _codex_item_hint(item: dict[str, Any]) -> str:
+    """A few safe words about a completed Codex tool item, never its full payload."""
+    for key in ("path", "command", "query", "url", "server", "tool"):
+        if item.get(key):
+            return f"{item.get('type', 'tool')} {str(item[key])[:120]}"
+    changes = item.get("changes")
+    if isinstance(changes, list):
+        paths = [str(c.get("path")) for c in changes[:4] if isinstance(c, dict) and c.get("path")]
+        if paths:
+            return f"file change: {', '.join(paths)}"
+    return str(item.get("type") or "tool")
 
 
 # -- publishing ------------------------------------------------------------
@@ -432,7 +437,7 @@ def handle(job: dict[str, Any]) -> None:
         job["changelog"] = _changelog_target(wt)
         install_if_needed(job, wt, feed)
 
-        session = run_claude(job, wt, feed)
+        session = run_codex(job, wt, feed)
         outcome.update({k: session.get(k) for k in ("turns", "cost_usd", "duration_s")})
         outcome["summary"] = session.get("summary") or ""
         outcome["branch"] = job["branch"]
@@ -451,7 +456,7 @@ def handle(job: dict[str, Any]) -> None:
             raise RuntimeError(f"refusing to open a pull request touching "
                                f"{stat['files_changed']} files (the limit is {ceiling})")
         if stat["files_changed"] == 0:
-            feed.add("step", "claude changed nothing")
+            feed.add("step", "Codex changed nothing")
             outcome.update({"ok": True, "verify": "skipped",
                             "summary": (outcome["summary"] or "No change was needed.")})
             return
@@ -508,7 +513,7 @@ def main() -> int:
         log("MAINTAINER_RUNNER_TOKEN is not set — nothing can be claimed. Add it to "
             "config/secrets.json and to ~/.config/orion/maintainer.env.")
         return 1
-    for tool in ("git", "claude"):
+    for tool in ("git", "codex"):
         if not shutil.which(tool):
             log(f"{tool} is not on PATH; this runner cannot work without it")
             return 1

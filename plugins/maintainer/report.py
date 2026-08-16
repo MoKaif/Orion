@@ -38,8 +38,8 @@ def facts(scope: str) -> dict[str, Any]:
                 "runs_failed": len([r for r in runs if r["status"] == "failed"]),
                 "verification_failed": len([r for r in runs if r["verify"] == "failed"]),
                 "briefs_awaiting_your_approval": len(waiting),
-                "claude_minutes": round(sum(r["duration_s"] for r in runs) / 60, 1),
-                "claude_cost_usd": round(sum(r["cost_usd"] for r in runs), 2),
+                "codex_minutes": round(sum(r["duration_s"] for r in runs) / 60, 1),
+                "codex_cost_usd": round(sum(r["cost_usd"] for r in runs), 2),
             }
         }
     finally:
@@ -72,7 +72,7 @@ def sections(scope: str) -> list[dict[str, Any]]:
         changed = sum(r["files_changed"] for r in runs)
         minutes = sum(r["duration_s"] for r in runs) / 60
         rows = [("runs", len(runs)), ("files changed", changed),
-                ("Claude time", f"{minutes:.0f} min")]
+                ("Codex time", f"{minutes:.0f} min")]
         if failed:
             rows.append(("failed", len(failed)))
         out.append({

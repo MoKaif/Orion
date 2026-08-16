@@ -9,7 +9,7 @@
   "worktrees": "/home/nox/.local/share/orion-maintainer",
 
   "runner": {
-    "//": "One task at a time. max_run_minutes bounds a Claude run; the sweep job reaps",
+    "//": "One task at a time. max_run_minutes bounds a Codex run; the sweep job reaps",
     "//2": "anything still silent past it, so a killed runner cannot strand a task forever.",
     "poll_seconds": 20,
     "max_run_minutes": 45,
@@ -18,20 +18,22 @@
     "max_files": 200
   },
 
-  "claude": {
-    "//": "Headless Claude Code on the host. Auth is the OAuth session in ~/.claude — never",
-    "//2": "pass --bare, which forces ANTHROPIC_API_KEY and would bill the empty API account.",
-    "bin": "claude",
-    "model": "sonnet",
-    "max_turns": 40,
-    "permission_mode": "acceptEdits"
+  "codex": {
+    "//": "Non-interactive Codex on the host. It reuses the saved CLI authentication.",
+    "//2": "Leave model empty to follow the installed CLI's current default.",
+    "bin": "codex",
+    "model": "",
+    "reasoning_effort": "high",
+    "sandbox": "workspace-write"
   },
 
   "scan": {
-    "//": "The nightly read. Facts are gathered here; DeepSeek only shapes them into briefs.",
+    "//": "The nightly audit. Facts are gathered here; DeepSeek only shapes them into briefs.",
     "max_candidates_per_repo": 2,
     "commits": 25,
     "todo_hits": 20,
+    "source_files": 5,
+    "dedupe_days": 90,
     "expire_briefs_days": 14,
     "skip": [".env", ".env.local", ".env.production", "secrets", "credentials",
              "node_modules", ".git", "dist", ".next", "bin", "obj", "venv", "publish"]

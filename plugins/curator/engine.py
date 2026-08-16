@@ -288,6 +288,11 @@ def _apply_edit(c, vault: Path, row: dict[str, Any], kind: str) -> dict[str, Any
                   (store.now(), row["id"]))
         c.commit()
         return {"ok": False, "reason": "note changed on disk since the proposal — rescan"}
+    if kind == "grammar" and not grammar.preserves_structure(current, row["corrected_text"]):
+        c.execute("UPDATE proposals SET status='invalid', resolved_at=? WHERE id=?",
+                  (store.now(), row["id"]))
+        c.commit()
+        return {"ok": False, "reason": "unsafe grammar proposal changed note structure"}
     backup = _backup(current, row["path"])
     target.write_text(row["corrected_text"], encoding="utf-8")
     new_h = notes.sha(row["corrected_text"])

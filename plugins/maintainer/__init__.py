@@ -9,7 +9,7 @@ a note; it cannot land a feature. So the work is split by what each tier is actu
 
     DeepSeek (cheap)   reads each repo overnight and proposes work worth doing
     you                approve the brief, in the inbox, before a single expensive turn runs
-    Claude Code (host) does the engineering, in a throwaway worktree, on the host where it lives
+    Codex (host) does the engineering, in a throwaway worktree, on the host where it lives
     you                review the pull request on GitHub
 
 **Maintainer never merges, and never writes to a checkout you use.** Every change it makes
@@ -18,7 +18,7 @@ running at one in the morning: the worst case is a branch you close unread.
 
 This module is the part that lives inside Orion — the queue, the gate, the API. The hands are
 ``scripts/maintainer_runner.py`` on the host, which claims approved work over the protocol
-below. Orion never executes anything itself; the container has no claude, no gh, and a
+below. Orion never executes anything itself; the container has no codex, no gh, and a
 read-only view of your code.
 """
 from __future__ import annotations
@@ -48,16 +48,16 @@ def register() -> None:
         "maintainer", "Maintainer",
         tagline="Code",
         blurb="Reads your projects overnight and proposes work worth doing. When you approve a "
-              "brief, it hands the job to Claude Code on your own machine, in a throwaway "
+              "brief, it hands the job to Codex on your own machine, in a throwaway "
               "worktree, and opens a pull request for you to review. It never merges, never "
               "pushes to main, and never touches the checkout you are working in.",
         icon="git-pull-request", accent="idea", plugin="maintainer", order=40,
         summary=_summary, detail=_detail)
 
     orion.add_job("scan_repos", "0 1 * * *", scan.scan_repos, agent="maintainer",
-                  label="Read the projects",
-                  description="Looks at what changed in each repo since last night and proposes "
-                              "work worth doing. Nothing runs until you approve it.",
+                  label="Audit the projects",
+                  description="Audits every enabled repo under a rotating maintenance focus, "
+                              "even when no commits changed. Nothing runs until you approve it.",
                   limit_default=6)
     orion.add_job("maintainer_sweep", "*/15 * * * *", scan.sweep, agent="maintainer",
                   label="Check on the runner",
@@ -197,7 +197,7 @@ def _inbox_items() -> list[dict[str, Any]]:
             "origin": "maintainer", "id": t["id"],
             "title": f"Work on “{t['title']}” in {t['repo']}",
             "body": body[:1600],
-            "effect": (f"Hands this to Claude Code on your machine, in a throwaway worktree "
+            "effect": (f"Hands this to Codex on your machine, in a throwaway worktree "
                        f"branched from {t['repo']}'s base branch, and opens a pull request for "
                        f"you to review. Your own checkout is not touched, and nothing merges."),
             "created_at": t.get("created_at") or "",
@@ -279,7 +279,7 @@ async def list_runs(limit: int = 25, status: str | None = None):
 
 @router.get("/runs/{run_id}")
 async def read_run(run_id: int):
-    """One run with its progress feed — what Claude actually did, step by step."""
+    """One run with its progress feed — what Codex actually did, step by step."""
     from . import store
     c = store.conn()
     try:
@@ -383,7 +383,7 @@ async def claim(body: ClaimRequest, authorization: str | None = Header(None)):
             "repo": repo,
             "run_id": run_id,
             "branch": f"maintainer/{task['slug']}-{task['id']}",
-            "claude": repos.settings().get("claude") or {},
+            "codex": repos.settings().get("codex") or {},
             "runner": repos.settings().get("runner") or {},
             "worktrees": repos.settings().get("worktrees"),
         }

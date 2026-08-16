@@ -3,7 +3,7 @@
   "//2": "fastembed), every change gated behind human review. Four passes: grammar fixes,",
   "//3": "an entity registry, [[wikilink]] backlinks for the graph view, and journal→memory.",
   "name": "curator",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "specialists": [],
   "agents": ["curator"],
   "tools": [],

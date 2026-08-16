@@ -84,7 +84,7 @@ _AI_TELLS = ("Here's your", "Here is your", "I'll design", "Let me design",
 
 
 def classify(text: str) -> str:
-    """Return a handling class: 'skip' | 'template' | 'quotes' | 'journal' | 'prose' | 'code'.
+    """Return a handling class: skip/template/quotes/hub/journal/prose/code.
 
     Only 'journal' and 'prose' are safe to grammar-fix or mine; the rest are left alone.
     """
@@ -93,6 +93,11 @@ def classify(text: str) -> str:
         return "skip"
     if len(text) > _MAX_NOTE_CHARS:
         return "skip"
+    # Curator-authored entity hubs are structured indexes, not prose. In particular their
+    # frontmatter is machine-readable state and must never be sent through the grammar model.
+    if re.match(r"\A(?:\ufeff)?---\r?\n.*?^curator_entity_id:\s*\d+\s*$.*?^---\s*$",
+                text, re.DOTALL | re.MULTILINE):
+        return "hub"
     if _TEMPLATE.search(text):
         return "template"
     # a note that is mostly a fenced code / dataview block is structure, not prose

@@ -180,7 +180,7 @@ export interface MaintainerTask {
   created_at: string;
 }
 
-/** One attempt at a task: what Claude did, whether it stood up, what it cost. */
+/** One attempt at a task: what Codex did, whether it stood up, what it cost. */
 export interface MaintainerRun {
   id: number;
   task_id: number;

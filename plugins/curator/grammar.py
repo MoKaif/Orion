@@ -13,10 +13,21 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections import Counter
 
 from . import llm, notes
 
 _MAX_DIFF_LINES = 80
+
+_FRONTMATTER = re.compile(r"\A(?:\ufeff)?---\r?\n.*?\r?\n---(?:\r?\n|\Z)", re.DOTALL)
+_FENCED_CODE = re.compile(r"^```.*?^```[^\n]*(?:\n|\Z)", re.DOTALL | re.MULTILINE)
+_WIKILINK = re.compile(r"!?\[\[[^\]]+\]\]")
+_MARKDOWN_LINK = re.compile(r"!?\[[^\]]+\]\([^)]+\)")
+_INLINE_CODE = re.compile(r"`[^`\n]+`")
+_URL = re.compile(r"https?://[^\s)>]+")
+_TAG = re.compile(r"(?<!\w)#[\w/-]+")
+_HEADING = re.compile(r"^(#{1,6}\s+.*)$", re.MULTILINE)
+_LIST_PREFIX = re.compile(r"^(\s*(?:(?:[-+*])|(?:\d+[.)]))\s+)")
 
 _SYSTEM = (
     "You are Curator, the careful editor of a personal Obsidian vault. Correct ONLY "
@@ -50,6 +61,32 @@ def mechanical_fixes(text: str) -> str:
     return joined
 
 
+def preserves_structure(original: str, corrected: str) -> bool:
+    """Whether a model rewrite kept every non-prose part of a note byte-for-byte.
+
+    Prompt instructions are not a safety boundary.  This check is: a grammar proposal is
+    discarded if it changes frontmatter, code, links, tags, URLs, headings, list markers, or
+    line layout.  Comparing counters also catches a protected token being moved between lines.
+    """
+    if original.count("\n") != corrected.count("\n"):
+        return False
+
+    for pattern in (_FRONTMATTER, _FENCED_CODE):
+        if Counter(pattern.findall(original)) != Counter(pattern.findall(corrected)):
+            return False
+
+    for before, after in zip(original.splitlines(), corrected.splitlines()):
+        for pattern in (_WIKILINK, _MARKDOWN_LINK, _INLINE_CODE, _URL, _TAG, _HEADING):
+            if Counter(pattern.findall(before)) != Counter(pattern.findall(after)):
+                return False
+        before_prefix = _LIST_PREFIX.match(before)
+        after_prefix = _LIST_PREFIX.match(after)
+        if ((before_prefix.group(1) if before_prefix else None)
+                != (after_prefix.group(1) if after_prefix else None)):
+            return False
+    return True
+
+
 async def correct(text: str) -> str | None:
     """One JSON-constrained local grammar pass. None means 'no usable correction'."""
     data = await llm.extract(_SYSTEM, text)
@@ -62,7 +99,8 @@ async def correct(text: str) -> str | None:
     if abs(len(out) - len(text)) > max(200, len(text) * 0.2):
         return None
     # preserve the note's exact trailing-newline shape
-    return out + re.search(r"\n*$", text).group()
+    out += re.search(r"\n*$", text).group()
+    return out if preserves_structure(text, out) else None
 
 
 async def propose_for(text: str, rel: str) -> tuple[str, str] | None:

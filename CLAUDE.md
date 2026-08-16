@@ -1,7 +1,8 @@
-# CLAUDE.md — Orion
+# CLAUDE.md — Orion (legacy compatibility)
 
-Guidance for Claude Code working in this repo. Read the three docs in `docs/` first; they are
-the source of truth and this file is the operational summary.
+Codex and other coding agents should read `AGENTS.md` first. This older operational reference
+remains for tools that still discover `CLAUDE.md`; the three docs in `docs/` are the source of
+truth.
 
 ## Versioning — non-negotiable
 
@@ -266,17 +267,17 @@ never a drip). Own store: `data/herald.db` (WAL + 30 s busy_timeout like the Cur
 ## Maintainer plugin (v1 done) — the first agent that changes code outside Orion
 
 `plugins/maintainer/` — reads your projects overnight, proposes work, and (once you approve the
-brief) hands the job to **Claude Code on the host**, which opens a pull request you review on
+brief) hands the job to **Codex on the host**, which opens a pull request you review on
 GitHub. It exists because the local 3B model can't land a feature and DeepSeek isn't a coding
-agent with a filesystem — but `~/.local/bin/claude` already is, authenticated by the OAuth
-session in `~/.claude`, i.e. **billed to the subscription, not the $0 API account**.
+agent with a filesystem — but `~/.local/bin/codex` already is, authenticated by the saved
+Codex CLI login.
 
 **Never merges, never writes to a checkout you use.** Every run branches from `origin/<base>`
 inside Maintainer's own worktree; the PR is the only output. `merge_pr` is in
 `constitution.IRREVERSIBLE_ACTIONS` and there is no merge code path at all.
 
 - **Split by tier**: DeepSeek proposes (`scan.py`, `Mode.REASONING`) · you approve in the inbox ·
-  Claude Code does the engineering · you review on GitHub. Nothing expensive runs unapproved.
+  Codex does the engineering · you review on GitHub. Nothing expensive runs unapproved.
 - **The container reads, the runner writes.** `docker-compose.yml` mounts
   `/home/nox/Developing-Environment` **`:ro` at the same path** (the vault's trick), so Orion can
   scan every repo and is incapable of modifying one. `git` is now in the image for that read.
@@ -290,9 +291,9 @@ inside Maintainer's own worktree; the PR is the only output. `merge_pr` is in
   `changelog_target()` only ever asks a run to edit a changelog that is actually tracked.
 - **Guards are code, not prompt**: `assert_safe()` refuses any worktree outside the configured
   root, pushes are refused unless the branch is `maintainer/*`, never `--force`. The child env is
-  scrubbed of Orion's secrets — chiefly `ANTHROPIC_API_KEY`, whose presence would redirect
-  billing to the empty account. Never pass `--bare` (it forces API-key auth).
-- **A stalled run is observable**: a watchdog thread kills Claude at `max_run_minutes` (reading
+  scrubbed of Orion's provider keys, including `OPENAI_API_KEY` and `CODEX_API_KEY`, so they
+  cannot change authentication or leak into repository commands.
+- **A stalled run is observable**: a watchdog thread kills Codex at `max_run_minutes` (reading
   stdout blocks, so a deadline checked in the read loop would never fire), a heartbeat flushes
   every 60s, and `maintainer_sweep` reaps anything silent past that + 15 min.
 - **One core addition**: `orion/core/reports.py` + `plugin_sdk.add_report_source` — how a plugin

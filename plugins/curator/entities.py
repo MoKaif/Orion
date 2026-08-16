@@ -139,10 +139,13 @@ def register_mention(c, mention: dict[str, str],
     eid, score = resolve(c, mention, embed_cache)
     if eid is not None:
         row = c.execute("SELECT * FROM entities WHERE id=?", (eid,)).fetchone()
-        aliases = set(json.loads(row["aliases"])) | {mention["name"]}
+        old_aliases = set(json.loads(row["aliases"]))
+        aliases = old_aliases | {mention["name"]}
         c.execute("UPDATE entities SET mentions=mentions+1, aliases=?, updated_at=? WHERE id=?",
                   (json.dumps(sorted(aliases)), store.now(), eid))
         c.commit()
+        if row["status"] == "approved" and aliases != old_aliases:
+            store.invalidate_backlinks(c)
         # A fuzzy (non-exact) resolve is worth confirming. The merge has *already* happened
         # optimistically, so the question records which entity absorbed which alias — that's
         # what lets "no, different" actually split them back apart.
@@ -194,6 +197,7 @@ def approve_into_world_model(c, entity_id: int) -> int | None:
     c.execute("UPDATE entities SET status='approved', wm_entity_id=?, updated_at=? WHERE id=?",
               (wm_id, store.now(), entity_id))
     c.commit()
+    store.invalidate_backlinks(c)
     return wm_id
 
 
@@ -267,6 +271,8 @@ def _split_alias(c, entity_id: int, alias: str, subject: str) -> str:
     aliases = [a for a in json.loads(row["aliases"] or "[]") if a.lower() != alias.lower()]
     c.execute("UPDATE entities SET aliases=?, mentions=MAX(mentions-1, 0), updated_at=? WHERE id=?",
               (json.dumps(sorted(aliases)), store.now(), entity_id))
+    if row["status"] == "approved":
+        store.invalidate_backlinks(c)
     canon = canonical(alias)
     if not canon:
         return "split"          # the alias names no one on its own; nothing to split out to

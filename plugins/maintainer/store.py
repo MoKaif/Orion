@@ -1,13 +1,13 @@
 """Maintainer's own SQLite store (``data/maintainer.db``) — the work queue and the run log.
 
-Three tables and one rule: **a task is a durable row before it is a Claude run**, the same
+Three tables and one rule: **a task is a durable row before it is a Codex run**, the same
 discipline Herald applies to mail. That is what lets a brief wait in your inbox indefinitely, a
 killed runner be reaped instead of stranding work, and every run be readable afterwards —
 what was asked, what changed, what it cost, whether the build passed.
 
   tasks   the queue. proposed → approved → claimed → running → done | failed (or rejected)
-  runs    one attempt at a task: branch, PR, diffstat, verification, Claude's own accounting
-  events  the runner's progress feed, so the agent page shows what Claude is doing live
+  runs    one attempt at a task: branch, PR, diffstat, verification, Codex accounting
+  events  the runner's progress feed, so the agent page shows what Codex is doing live
 
 Same connection discipline as the Curator's and Herald's stores — WAL plus a 30s
 ``busy_timeout`` — because the scan pass, the sweep pass and the runner's HTTP callbacks will
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     repo TEXT NOT NULL,
     title TEXT NOT NULL,
     slug TEXT NOT NULL,                      -- branch-safe, derived from the title
-    brief TEXT NOT NULL,                     -- what the runner hands Claude
+    brief TEXT NOT NULL,                     -- what the runner hands Codex
     rationale TEXT NOT NULL DEFAULT '',      -- why this is worth a run, in the user's terms
     acceptance TEXT NOT NULL DEFAULT '',     -- how we will know it worked
     files TEXT NOT NULL DEFAULT '[]',        -- JSON list of likely-relevant paths
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS runs (
     duration_s REAL NOT NULL DEFAULT 0.0,
     verify TEXT NOT NULL DEFAULT 'skipped',  -- passed | failed | skipped
     verify_tail TEXT NOT NULL DEFAULT '',
-    summary TEXT NOT NULL DEFAULT '',        -- Claude's own account of what it did
+    summary TEXT NOT NULL DEFAULT '',        -- Codex's own account of what it did
     error TEXT,
     started_at TEXT NOT NULL,
     heartbeat_at TEXT NOT NULL,
@@ -167,6 +167,19 @@ def open_titles(c: sqlite3.Connection, repo: str) -> list[str]:
     marks = ",".join("?" * len(OPEN_STATUSES))
     return [r["title"] for r in c.execute(
         f"SELECT title FROM tasks WHERE repo=? AND status IN ({marks})", (repo, *OPEN_STATUSES))]
+
+
+def recent_titles(c: sqlite3.Connection, repo: str, days: int = 90,
+                  limit: int = 30) -> list[str]:
+    """Recently considered work, including completed/rejected tasks.
+
+    Nightly audits revisit unchanged code, so open-task deduplication alone is insufficient:
+    the model can otherwise rediscover yesterday's rejected cleanup under the same title.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    return [r["title"] for r in c.execute(
+        "SELECT title FROM tasks WHERE repo=? AND created_at>=? ORDER BY id DESC LIMIT ?",
+        (repo, cutoff, limit))]
 
 
 def set_status(c: sqlite3.Connection, tid: int, status: str, **stamps: Any) -> None:

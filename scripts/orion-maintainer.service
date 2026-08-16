@@ -1,7 +1,7 @@
 # Maintainer's host runner — the half of the agent that can actually write code.
 #
 # It runs as *you*, not as root and not in a container, because that is where the things it
-# needs already live: your Claude Code OAuth session in ~/.claude, your gh and ssh credentials,
+# needs already live: your Codex CLI login, your gh and ssh credentials,
 # node/pnpm/dotnet, and the repos themselves. Orion stays sealed and merely hands out work.
 #
 # Install:
@@ -17,8 +17,8 @@
 # Watch it:  journalctl --user -u orion-maintainer -f
 
 [Unit]
-Description=Orion Maintainer runner (claims approved work and runs Claude Code)
-Documentation=file:///home/nox/Developing-Environment/Orion-v2/CLAUDE.md
+Description=Orion Maintainer runner (claims approved work and runs Codex)
+Documentation=file:///home/nox/Developing-Environment/Orion-v2/AGENTS.md
 After=network-online.target
 
 [Service]

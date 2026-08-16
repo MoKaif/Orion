@@ -121,7 +121,7 @@ reference implementation.
 - [ ] Raspberry Pi / voice client as another thin interface to the same backend.
 - [x] **Maintainer** (`plugins/maintainer/`) — the first agent that changes code outside Orion.
       DeepSeek reads each project overnight and proposes work; you approve the brief in the
-      inbox; **Claude Code on the host** does the engineering in a throwaway worktree; a pull
+      inbox; **Codex on the host** does the engineering in a throwaway worktree; a pull
       request comes back for you to review. It never merges and never writes to a checkout you
       use. The container gets the workspace read-only and does no execution at all — the hands
       are `scripts/maintainer_runner.py`, a `systemd --user` service that claims work over HTTP.

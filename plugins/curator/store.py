@@ -49,7 +49,12 @@ CREATE TABLE IF NOT EXISTS questions (
     subject TEXT NOT NULL, question TEXT NOT NULL,
     answer TEXT, status TEXT NOT NULL DEFAULT 'open',  -- open | answered | dismissed
     created_at TEXT NOT NULL, answered_at TEXT);
+
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
 """
+
+_BACKLINK_CHECKPOINT_VERSION = "2"
 
 # columns added after v1 shipped: (table, column, decl)
 _MIGRATIONS = [
@@ -114,6 +119,29 @@ def _migrate(c: sqlite3.Connection) -> None:
     c.commit()
     _backfill_questions(c)
     _heal_blank_canonicals(c)
+    _upgrade_backlink_checkpoints(c)
+
+
+def _upgrade_backlink_checkpoints(c: sqlite3.Connection) -> None:
+    """Rescan old vaults after checkpoint semantics or link matching changes.
+
+    The original checkpoint only represented note text. It stayed current when the entity
+    registry grew, leaving mentions of newly approved entities permanently unlinked.
+    """
+    row = c.execute("SELECT value FROM meta WHERE key='backlink_checkpoint_version'").fetchone()
+    if row is None or row["value"] != _BACKLINK_CHECKPOINT_VERSION:
+        c.execute("UPDATE notes SET linked_sha=NULL")
+        c.execute(
+            "INSERT INTO meta (key, value, updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            ("backlink_checkpoint_version", _BACKLINK_CHECKPOINT_VERSION, now()))
+        c.commit()
+
+
+def invalidate_backlinks(c: sqlite3.Connection) -> None:
+    """Make every note eligible after the closed-set entity registry changes."""
+    c.execute("UPDATE notes SET linked_sha=NULL")
+    c.commit()
 
 
 def _heal_blank_canonicals(c: sqlite3.Connection) -> None:

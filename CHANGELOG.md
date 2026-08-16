@@ -10,6 +10,18 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.11.1] — 2026-08-16
+
+Fix Curator and automate Maintainer audits
+
+### Changed
+- Run nightly Maintainer audits on unchanged repositories with rotating source inspection
+- Move Maintainer execution from Claude Code to Codex
+
+### Fixed
+- Protect Curator metadata and wikilinks during grammar review
+- Invalidate stale backlink checkpoints when the entity registry changes
+
 ## [0.11.0] — 2026-08-03
 
 Maintainer proposes code changes and opens pull requests you review
