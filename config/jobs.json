@@ -15,6 +15,7 @@
     "grow_memory":      { "enabled": true, "cron": "30 3 * * *", "limit": 8, "//": "Curator · journal to memory" },
     "weave_graph":      { "enabled": true, "cron": "45 3 * * *", "limit": 8, "//": "Curator · backlinks" },
     "curator_backfill": { "enabled": true, "cron": "0 4 * * *",  "limit": 8, "//": "Curator · a slice of every pass" },
+    "invite_memory":    { "enabled": true, "cron": "0 18 * * *", "//": "Curator · one gentle memory invitation" },
     "index_vault":      { "enabled": true, "cron": "0 * * * *",  "//": "Curator · hourly search index" },
 
     "treasurer_refresh": { "enabled": true, "cron": "0 */4 * * *", "//": "Treasurer · refresh FinStrive figures" },

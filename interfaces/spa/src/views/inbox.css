@@ -297,6 +297,7 @@
 /* ---- answering a question ---------------------------------------------- */
 .answer {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   margin-top: 2px;
 }
@@ -310,6 +311,7 @@
   font-family: inherit;
   font-size: 12.5px;
   padding: 7px 10px;
+  resize: vertical;
 }
 .answer-input:focus {
   outline: none;

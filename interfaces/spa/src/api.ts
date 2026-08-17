@@ -32,7 +32,7 @@ export interface InboxItem {
   /** Which source produced this. The named ones are what the resolver knows how to route;
    *  any plugin may register a source with an origin core has never heard of, so the type
    *  stays open and unknown origins fall through to the world-model review endpoint. */
-  origin: "world_model" | "curator" | "curator_question" | "herald" | (string & {});
+  origin: "world_model" | "curator" | "curator_question" | "curator_memory" | "herald" | (string & {});
   id: number;
   created_at: string;
   prov_agent: string;
@@ -136,6 +136,34 @@ export interface Question {
   id: number;
   subject: string;
   question: string;
+}
+
+export interface MemoryPrompt {
+  id: number;
+  prompt_key: string;
+  category: string;
+  folder: string;
+  title: string;
+  question: string;
+  parent_id: number | null;
+  status: "open" | "answered" | "skipped";
+  note_path: string | null;
+  obsidian_uri?: string | null;
+  created_at: string;
+}
+
+export interface MemoryStats {
+  captured: number;
+  skipped: number;
+  open: number;
+}
+
+export interface MemorySaveResult {
+  ok: boolean;
+  outcome: string;
+  prompt_id: number;
+  note_path: string;
+  obsidian_uri?: string | null;
 }
 
 export interface RegistryEntity {
@@ -285,6 +313,8 @@ export interface AgentDetail {
   jobs: Job[];
   proposals?: Proposal[];
   questions?: Question[];
+  memory_prompt?: MemoryPrompt | null;
+  memory_stats?: MemoryStats;
   entities?: RegistryEntity[];
   hub_threshold?: number;
   mail?: MailMessage[];
@@ -410,6 +440,8 @@ export function useResolveInbox() {
       const { item, action } = v;
       if (item.origin === "curator_question") {
         await postForm(`/plugins/curator/questions/${item.id}`, { answer: action });
+      } else if (item.origin === "curator_memory") {
+        await postForm(`/plugins/curator/memory-prompts/${item.id}`, { answer: action });
       } else if (item.origin === "curator") {
         // curator proposals use apply|reject
         const a = action === "accept" ? "apply" : action === "reject" ? "reject" : action;
@@ -460,6 +492,35 @@ export function useUpdateJob(agent: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agent", agent] });
       qc.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
+/** Ask Curator for one scene-shaped cue. `replace` retires the current cue first. */
+export function useNextMemoryPrompt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { mode?: "surprise" | "continue"; parent_id?: number; replace?: boolean }) =>
+      sendJSON<MemoryPrompt>("/plugins/curator/memory-prompts/next", "POST", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent", "curator"] });
+      qc.invalidateQueries({ queryKey: ["inbox"] });
+    },
+  });
+}
+
+/** The button says Save raw memory: submitting it is the explicit vault-write approval. */
+export function useAnswerMemoryPrompt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, answer }: { id: number; answer: string }) =>
+      sendJSON<MemorySaveResult | MemoryPrompt>(
+        `/plugins/curator/memory-prompts/${id}`, "POST", { answer },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent", "curator"] });
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.invalidateQueries({ queryKey: ["inbox"] });
     },
   });
 }
