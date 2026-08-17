@@ -60,14 +60,17 @@ function AnswerBox({ item, onSend }: { item: InboxItem; onSend: (a: string) => v
       className="answer"
       onSubmit={(e) => {
         e.preventDefault();
-        if (text.trim()) onSend(text.trim());
+        if (text.trim()) onSend(item.origin === "curator_memory" ? text : text.trim());
         setText("");
       }}
     >
-      <input
+      <textarea
         className="answer-input"
         value={text}
-        placeholder="or answer in your own words…"
+        rows={item.origin === "curator_memory" ? 5 : 2}
+        placeholder={item.origin === "curator_memory"
+          ? "Write it as you remember it. Curator will preserve these exact words…"
+          : "or answer in your own words…"}
         aria-label={`Answer: ${item.title}`}
         onChange={(e) => setText(e.target.value)}
       />
@@ -129,7 +132,7 @@ function Actions({
 function Card({ item }: { item: InboxItem }) {
   const resolve = useResolveInbox();
   const act = (action: string) => resolve.mutate({ item, action });
-  const isQuestion = item.origin === "curator_question";
+  const isQuestion = item.origin === "curator_question" || item.origin === "curator_memory";
 
   return (
     <article className={`inbox-item item-${item.origin}`}>

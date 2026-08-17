@@ -7,6 +7,7 @@ v1 fixed grammar. v2 is the full editor, all on the SDK and pinned to local Olla
   * entities  — a resident registry of the vault's people/places/projects (embedding dedup)
   * backlinks — ``[[wikilinks]]`` proposals that light up Obsidian's graph view
   * memory    — mine dated journals into World Model knowledge (through the review inbox)
+  * interview — ask scene-shaped questions and preserve answers verbatim in ``Memory/``
 
 Each pass is an idle-by-default job; ``curator_backfill`` runs a bounded slice of all of them so
 the existing backlog is worked down over a few nights. Everything wires through
@@ -59,6 +60,11 @@ def register() -> None:
                   description="Runs one slice of every pass above, to work the backlog down "
                               "over a few nights.",
                   limit_default=8)
+    from . import interview
+    orion.add_job("invite_memory", "0 18 * * *", interview.ensure_prompt,
+                  agent="curator", label="Daily memory invitation",
+                  description="Keeps one thoughtful, scene-shaped memory question waiting. "
+                              "It never builds a backlog or treats old lists as homework.")
 
     # world-model vocabulary this plugin contributes (person/project are core already)
     orion.add_entity_type("place", "A location the user visits or references.", plugin="curator")
@@ -82,6 +88,7 @@ def _summary() -> dict:
             {"label": "notes read", "value": c.get("notes_tracked", 0)},
             {"label": "entities", "value": c.get("entities", 0)},
             {"label": "journals mined", "value": c.get("mined", 0)},
+            {"label": "memories captured", "value": c.get("memories_captured", 0)},
             {"label": "applied", "value": c.get("applied", 0)},
         ],
     }
@@ -89,17 +96,20 @@ def _summary() -> dict:
 
 def _detail() -> dict:
     """Extra panels for the Curator's page: what's waiting, what it wants to ask, who it knows."""
-    from . import engine, entities as ents, store
+    from . import engine, entities as ents, interview, store
 
     c = store.conn()
     try:
         questions = ents.open_questions(c)
+        memory_prompt = interview.current(c)
+        memory_stats = interview.stats(c)
         registry = [dict(r) for r in c.execute(
             "SELECT id, name, type, mentions, status, note_path FROM entities "
             "ORDER BY mentions DESC, id DESC LIMIT 40")]
     finally:
         c.close()
     return {"proposals": engine.proposals(), "questions": questions,
+            "memory_prompt": memory_prompt, "memory_stats": memory_stats,
             "entities": registry, "hub_threshold": ents._MENTION_THRESHOLD}
 
 
@@ -113,7 +123,7 @@ _EDIT_BLURB = {
 
 def _inbox_items() -> list[dict]:
     """Note edits and open questions, each saying plainly what accepting will do."""
-    from . import engine, entities as ents, store
+    from . import engine, entities as ents, interview, store
 
     items: list[dict] = []
     for p in engine.proposals():
@@ -174,6 +184,26 @@ def _inbox_items() -> list[dict]:
             "action_url": f"/plugins/curator/questions/{q['id']}",
             "actions": actions,
         })
+
+    c = store.conn()
+    try:
+        memory_prompt = interview.current(c)
+    finally:
+        c.close()
+    if memory_prompt:
+        items.append({
+            "origin": "curator_memory", "id": memory_prompt["id"],
+            "title": memory_prompt["question"],
+            "body": ("A small scene is enough. Your answer is source material, not a polished "
+                     "summary, and 'I don't remember' is always acceptable."),
+            "effect": ("Submitting saves your exact words as a protected raw-memory note under "
+                       f"Memory/{memory_prompt['folder']}/. Derived facts remain review-gated."),
+            "answerable": True, "created_at": memory_prompt.get("created_at") or "",
+            "prov_agent": "Curator", "prov_label": memory_prompt["category"],
+            "action_url": f"/plugins/curator/memory-prompts/{memory_prompt['id']}",
+            "actions": [orion.inbox_action("Different question", "__another__"),
+                        orion.inbox_action("Skip", "__dismiss__")],
+        })
     return items
 
 
@@ -184,6 +214,16 @@ class ProposalAction(BaseModel):
 
 class Answer(BaseModel):
     answer: str
+
+
+class MemoryPromptNext(BaseModel):
+    mode: str = "surprise"  # surprise | continue
+    parent_id: int | None = None
+    replace: bool = False
+
+
+class MemoryAnswer(BaseModel):
+    answer: str = ""
 
 
 @router.get("/proposals")
@@ -233,6 +273,28 @@ async def answer(qid: int, body: Answer):
         return entities.answer_question(c, qid, body.answer)
     finally:
         c.close()
+
+
+@router.post("/memory-prompts/next")
+async def next_memory_prompt(body: MemoryPromptNext):
+    from . import interview
+    if body.replace:
+        return interview.another_subject()
+    if body.mode == "continue" and body.parent_id is not None:
+        return await interview.continue_thread(body.parent_id)
+    return interview.ensure_prompt()
+
+
+@router.post("/memory-prompts/{prompt_id}")
+async def answer_memory_prompt(prompt_id: int, body: MemoryAnswer):
+    from . import interview
+    action = body.answer.strip()
+    if action in ("", "__dismiss__"):
+        return interview.skip(prompt_id)
+    if action == "__another__":
+        interview.skip(prompt_id)
+        return interview.another_subject()
+    return interview.save_answer(prompt_id, body.answer)
 
 
 @router.post("/scan")

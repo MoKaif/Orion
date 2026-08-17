@@ -15,13 +15,21 @@ import {
   CircleAlert,
   GitPullRequest,
   WalletCards,
+  MessageCircleQuestion,
+  Shuffle,
+  Save,
   LucideIcon,
 } from "lucide-react";
 import {
   InboxItem,
   Job,
   MaintainerRun,
+  MemoryPrompt,
+  MemorySaveResult,
+  MemoryStats,
   useAgentDetail,
+  useAnswerMemoryPrompt,
+  useNextMemoryPrompt,
   useResolveInbox,
   useRunJob,
   useUpdateJob,
@@ -205,6 +213,112 @@ function Pass({ job, agent }: { job: Job; agent: string }) {
   );
 }
 
+function MemoryInterview({
+  prompt,
+  stats,
+}: {
+  prompt?: MemoryPrompt | null;
+  stats?: MemoryStats;
+}) {
+  const next = useNextMemoryPrompt();
+  const save = useAnswerMemoryPrompt();
+  const [answer, setAnswer] = useState("");
+  const [completed, setCompleted] = useState<number | null>(null);
+  const [lastSaved, setLastSaved] = useState<MemorySaveResult | null>(null);
+  const visible = prompt && prompt.id !== completed ? prompt : null;
+  const busy = next.isPending || save.isPending;
+  const error = next.error ?? save.error;
+
+  const ask = (body: { mode?: "surprise" | "continue"; parent_id?: number; replace?: boolean }) => {
+    setLastSaved(null);
+    setCompleted(null);
+    next.mutate(body);
+  };
+
+  const submit = () => {
+    if (!visible || !answer.trim()) return;
+    save.mutate(
+      { id: visible.id, answer },
+      {
+        onSuccess: (result) => {
+          if ("note_path" in result) setLastSaved(result as MemorySaveResult);
+          setCompleted(visible.id);
+          setAnswer("");
+        },
+      },
+    );
+  };
+
+  return (
+    <section className="memory-interview card">
+      <header className="memory-interview-head">
+        <span className="memory-interview-mark"><MessageCircleQuestion size={18} /></span>
+        <div>
+          <p className="memory-eyebrow">Memory interview</p>
+          <h2>Preserve one thing you still remember</h2>
+          <p>Not homework and not a completeness test. A tiny scene or an unfinished list counts.</p>
+        </div>
+        <span className="memory-count">{stats?.captured ?? 0} captured</span>
+      </header>
+
+      {visible ? (
+        <div className="memory-cue">
+          <span className="kind-badge kind-question">{visible.category}</span>
+          <blockquote>{visible.question}</blockquote>
+          <textarea
+            value={answer}
+            rows={7}
+            placeholder="Write it exactly as it comes back. Curator will not polish these words."
+            onChange={(e) => setAnswer(e.target.value)}
+            disabled={busy}
+          />
+          <div className="memory-actions">
+            <button className="btn btn-primary" disabled={busy || !answer.trim()} onClick={submit}>
+              {save.isPending ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
+              Save raw memory
+            </button>
+            <button className="btn btn-ghost" disabled={busy}
+                    onClick={() => ask({ replace: true })}>
+              <Shuffle size={13} /> Different question
+            </button>
+          </div>
+          <p className="memory-contract">
+            Saves your exact answer under <code>Memory/{visible.folder}/</code>. Generated facts
+            and links still wait for review.
+          </p>
+        </div>
+      ) : lastSaved ? (
+        <div className="memory-saved">
+          <Check size={17} />
+          <div>
+            <b>Preserved in {lastSaved.note_path}</b>
+            <p>Your wording is protected from Curator's grammar and backlink passes.</p>
+          </div>
+          {lastSaved.obsidian_uri && <a className="btn btn-ghost" href={lastSaved.obsidian_uri}>Open in Obsidian</a>}
+          <button className="btn btn-ghost" disabled={busy}
+                  onClick={() => ask({ mode: "continue", parent_id: lastSaved.prompt_id })}>
+            Continue this memory
+          </button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => ask({ mode: "surprise" })}>
+            Another subject
+          </button>
+        </div>
+      ) : (
+        <div className="memory-empty">
+          <p>Curator will choose a concrete cue across school, building life, games, shows,
+             family, objects, routines, and transitions.</p>
+          <button className="btn btn-primary" disabled={busy} onClick={() => ask({ mode: "surprise" })}>
+            {next.isPending ? <Loader2 size={13} className="spin" /> : <MessageCircleQuestion size={13} />}
+            Ask me a memory
+          </button>
+        </div>
+      )}
+
+      {error && <p className="pass-error">{error instanceof Error ? error.message : "That did not go through."}</p>}
+    </section>
+  );
+}
+
 export default function AgentDetail() {
   const { name = "" } = useParams();
   const { data, isLoading, isError } = useAgentDetail(name);
@@ -280,6 +394,10 @@ export default function AgentDetail() {
           <ShiftStrip jobs={jobs} />
         </div>
       </section>
+
+      {agent.name === "curator" && (
+        <MemoryInterview prompt={data.memory_prompt} stats={data.memory_stats} />
+      )}
 
       {mailer && !mailer.ok && (
         <p className="ap-blocked">

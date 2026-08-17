@@ -21,7 +21,7 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from orion.core.config import config
 
@@ -44,7 +44,8 @@ sha = notes.sha
 
 # -- shared new-or-changed iterator ----------------------------------------
 def _todo(c, column: str, limit: int, editable_only: bool = True,
-          block_kinds: list[str] | None = None) -> Iterator[tuple[Path, str, str, str]]:
+          block_kinds: list[str] | None = None,
+          eligible: Callable[[str], bool] | None = None) -> Iterator[tuple[Path, str, str, str]]:
     """Yield (path, rel, text, sha) for notes unseen-or-changed since `column`'s checkpoint.
 
     ``block_kinds`` lists proposal kinds whose pending existence should skip a note — used by
@@ -68,7 +69,8 @@ def _todo(c, column: str, limit: int, editable_only: bool = True,
         h = notes.sha(text)
         if seen.get(rel) == h or rel in pending:
             continue
-        if editable_only and not notes.editable(notes.classify(text)):
+        allowed = eligible(text) if eligible is not None else notes.editable(notes.classify(text))
+        if editable_only and not allowed:
             store.mark_note(c, rel, **{column: h})   # checkpoint so we never re-check it
             continue
         yielded += 1
@@ -113,7 +115,8 @@ async def _build_registry(limit: int) -> dict[str, Any]:
     c = store.conn()
     checked = mentions = 0
     embed_cache: dict[str, list[float]] = {}
-    for _path, rel, text, h in _todo(c, "entity_sha", limit, block_kinds=[]):
+    for _path, rel, text, h in _todo(c, "entity_sha", limit, block_kinds=[],
+                                     eligible=lambda value: notes.mineable(notes.classify(value))):
         checked += 1
         for mention in await entities.mine_note(text):
             if entities.register_mention(c, mention, embed_cache) is not None:
@@ -191,7 +194,8 @@ async def _grow_memory(limit: int) -> dict[str, Any]:
         return {"ok": False, "reason": "local model unreachable"}
     c = store.conn()
     checked = queued = accepted = 0
-    for _path, rel, text, h in _todo(c, "mined_sha", limit, block_kinds=[]):
+    for _path, rel, text, h in _todo(c, "mined_sha", limit, block_kinds=[],
+                                     eligible=memory.mineable):
         checked += 1
         tally = await memory.mine_note(text, rel)
         queued += tally.get("queued", 0)

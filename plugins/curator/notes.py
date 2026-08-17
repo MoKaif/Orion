@@ -84,20 +84,27 @@ _AI_TELLS = ("Here's your", "Here is your", "I'll design", "Let me design",
 
 
 def classify(text: str) -> str:
-    """Return a handling class: skip/template/quotes/hub/journal/prose/code.
+    """Return a handling class: skip/template/quotes/hub/raw_memory/journal/prose/code.
 
-    Only 'journal' and 'prose' are safe to grammar-fix or mine; the rest are left alone.
+    Raw memories are safe to mine for entities and reviewable World Model knowledge, but their
+    wording is source material and must never enter the grammar or backlink editing passes.
     """
     stripped = text.strip()
     if not stripped:
         return "skip"
     if len(text) > _MAX_NOTE_CHARS:
         return "skip"
+    frontmatter_match = re.match(
+        r"\A(?:\ufeff)?---\r?\n(?P<body>.*?)^---\s*$", text, re.DOTALL | re.MULTILINE)
+    frontmatter = frontmatter_match.group("body") if frontmatter_match else ""
     # Curator-authored entity hubs are structured indexes, not prose. In particular their
     # frontmatter is machine-readable state and must never be sent through the grammar model.
-    if re.match(r"\A(?:\ufeff)?---\r?\n.*?^curator_entity_id:\s*\d+\s*$.*?^---\s*$",
-                text, re.DOTALL | re.MULTILINE):
+    if re.search(r"^curator_entity_id:\s*\d+\s*$", frontmatter, re.MULTILINE):
         return "hub"
+    if (re.search(r"^type:\s*raw-memory\s*$", frontmatter, re.MULTILINE | re.IGNORECASE)
+            and re.search(r"^preserve_voice:\s*true\s*$", frontmatter,
+                          re.MULTILINE | re.IGNORECASE)):
+        return "raw_memory"
     if _TEMPLATE.search(text):
         return "template"
     # a note that is mostly a fenced code / dataview block is structure, not prose
@@ -119,5 +126,10 @@ def classify(text: str) -> str:
 
 
 def editable(cls: str) -> bool:
-    """Whether a class is safe for the grammar / mining passes to work on."""
+    """Whether Curator may rewrite the prose or insert backlinks."""
     return cls in ("journal", "prose")
+
+
+def mineable(cls: str) -> bool:
+    """Whether read-only entity and memory extraction may inspect this note."""
+    return cls in ("journal", "prose", "raw_memory")

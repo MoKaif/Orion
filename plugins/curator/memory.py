@@ -139,4 +139,4 @@ async def mine_note(text: str, rel: str) -> dict[str, int]:
 
 
 def mineable(text: str) -> bool:
-    return notes.editable(notes.classify(text))
+    return notes.mineable(notes.classify(text))

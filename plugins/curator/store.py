@@ -50,6 +50,28 @@ CREATE TABLE IF NOT EXISTS questions (
     answer TEXT, status TEXT NOT NULL DEFAULT 'open',  -- open | answered | dismissed
     created_at TEXT NOT NULL, answered_at TEXT);
 
+-- scene-shaped invitations to preserve raw recollections in the Obsidian vault. Kept apart
+-- from entity gap questions because an answer here is user-authored source material, not a
+-- registry correction.
+CREATE TABLE IF NOT EXISTS memory_prompts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prompt_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    folder TEXT NOT NULL,
+    title TEXT NOT NULL,
+    question TEXT NOT NULL,
+    parent_id INTEGER,
+    answer TEXT,
+    note_path TEXT,
+    status TEXT NOT NULL DEFAULT 'open',  -- open | answered | skipped
+    created_at TEXT NOT NULL,
+    answered_at TEXT);
+
+CREATE INDEX IF NOT EXISTS idx_memory_prompts_status
+    ON memory_prompts(status, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_prompts_one_open
+    ON memory_prompts(status) WHERE status='open';
+
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
 """
@@ -253,4 +275,8 @@ def counts(c: sqlite3.Connection) -> dict[str, int]:
         "SELECT COUNT(*) FROM entities WHERE status='approved'").fetchone()[0]
     out["questions_open"] = c.execute(
         "SELECT COUNT(*) FROM questions WHERE status='open'").fetchone()[0]
+    out["memory_prompts_open"] = c.execute(
+        "SELECT COUNT(*) FROM memory_prompts WHERE status='open'").fetchone()[0]
+    out["memories_captured"] = c.execute(
+        "SELECT COUNT(*) FROM memory_prompts WHERE status='answered'").fetchone()[0]
     return out

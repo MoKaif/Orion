@@ -1,9 +1,9 @@
 {
   "//": "Curator — the vault's resident editor and memory-builder. Local-only (Ollama +",
-  "//2": "fastembed), every change gated behind human review. Four passes: grammar fixes,",
-  "//3": "an entity registry, [[wikilink]] backlinks for the graph view, and journal→memory.",
+  "//2": "fastembed), every change gated behind human review. Edits, entity/backlink passes,",
+  "//3": "journal mining, and gentle raw-memory interviews all preserve the user's control.",
   "name": "curator",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "specialists": [],
   "agents": ["curator"],
   "tools": [],
@@ -14,12 +14,15 @@
     { "name": "build_registry", "cron": "15 3 * * *" },
     { "name": "grow_memory", "cron": "30 3 * * *" },
     { "name": "weave_graph", "cron": "45 3 * * *" },
-    { "name": "curator_backfill", "cron": "0 4 * * *" }
+    { "name": "curator_backfill", "cron": "0 4 * * *" },
+    { "name": "invite_memory", "cron": "0 18 * * *" }
   ],
   "api_routes": [
     "/plugins/curator/proposals",
     "/plugins/curator/entities",
     "/plugins/curator/questions",
+    "/plugins/curator/memory-prompts/next",
+    "/plugins/curator/memory-prompts/{prompt_id}",
     "/plugins/curator/passes/{name}",
     "/plugins/curator/scan"
   ],
