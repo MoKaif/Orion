@@ -6,6 +6,9 @@
   "finstrive": {
     "base_url": "http://127.0.0.1:5101",
     "transactions_path": "/api/transactions",
+    "mail_sync_path": "/api/transactions/sync-email-transactions",
+    "mail_sync_lookback_days": 2,
+    "mail_sync_timeout_seconds": 120,
     "token_env": "FINSTRIVE_TREASURER_TOKEN",
     "timeout_seconds": 20
   },

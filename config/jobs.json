@@ -19,6 +19,7 @@
     "index_vault":      { "enabled": true, "cron": "0 * * * *",  "//": "Curator · hourly search index" },
 
     "treasurer_refresh": { "enabled": true, "cron": "0 */4 * * *", "//": "Treasurer · refresh FinStrive figures" },
+    "treasurer_scan_mailbox": { "enabled": true, "cron": "*/30 * * * *", "//": "Treasurer · HDFC alerts to reconciliation" },
     "treasurer_analyze": { "enabled": true, "cron": "0 7 * * *", "//": "Treasurer · model spending before Herald" },
     "treasurer_train":   { "enabled": true, "cron": "30 6 * * 0", "//": "Treasurer · weekly model validation" },
 

@@ -10,6 +10,21 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [Unreleased]
+
+### Added
+- Treasurer can ask FinStrive to scan recent HDFC transaction-alert emails and
+  create unmapped reconciliation candidates every 30 minutes.
+- Mailbox scan results and failures are retained in Treasurer's job history for
+  review in the Orion UI.
+
+### Changed
+- Treasurer's FinStrive integration now exposes one narrowly scoped mutation:
+  the reconciliation-candidate mailbox scan. It still cannot map, skip, edit or
+  delete transactions.
+- Mailbox scans use a dedicated 120-second timeout so IMAP retrieval can finish
+  without weakening the shorter timeout used by ordinary transaction reads.
+
 ## [0.11.3] — 2026-08-16
 
 Correct Maintainer verification history
