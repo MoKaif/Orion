@@ -1,12 +1,14 @@
 # Treasurer
 
-Treasurer is Orion's read-only personal-finance agent. It reads FinStrive transactions, applies
+Treasurer is Orion's personal-finance agent. It reads FinStrive transactions, applies
 the same account-flow semantics as FinStrive's dashboard, learns expected spending ranges, and
 asks an LLM to interpret only findings whose figures were computed first.
 
 ## Trust boundary
 
-- FinStrive remains the source of truth; Treasurer has no write tool or write endpoint.
+- FinStrive remains the source of truth. Treasurer's only mutation is the dedicated mailbox-scan
+  endpoint, which can create unmapped reconciliation candidates but cannot map, skip, edit, or
+  delete transactions.
 - Raw transaction descriptions are processed locally and are not copied into the World Model.
 - Merchant names are withheld from LLM prompts by default.
 - ML is local. If scikit-learn is unavailable or history is thin, robust median/MAD baselines
@@ -21,8 +23,10 @@ FinStrive must expose its existing transaction API at `http://127.0.0.1:5101` by
 Override the URL in the gitignored `config/treasurer.local.json` layer. If FinStrive protects
 the endpoint, place `FINSTRIVE_TREASURER_TOKEN` in `config/secrets.json`; never commit it.
 
-The three jobs are visible and retunable on `/agents/treasurer`:
+The four jobs are visible and retunable on `/agents/treasurer`:
 
+- `treasurer_scan_mailbox` scans the last two days of HDFC alerts every 30 minutes and asks
+  FinStrive to create any new unmapped reconciliation entries.
 - `treasurer_refresh` refreshes the derived cache every four hours.
 - `treasurer_analyze` runs models and LLM interpretation at 07:00, before Herald's briefing.
 - `treasurer_train` validates the personal model weekly without spending an LLM turn.

@@ -1,8 +1,9 @@
 """Treasurer — Orion's evidence-backed personal-finance agent.
 
 Treasurer reads FinStrive, learns personal baselines locally, asks an LLM to interpret only
-validated evidence, and contributes concise findings to Herald. It is entirely read-only with
-respect to FinStrive. Inferred durable knowledge enters Orion only after an inbox action.
+validated evidence, and contributes concise findings to Herald. Its one narrow FinStrive write
+asks the bank-alert scanner to create unmapped reconciliation candidates. Inferred durable
+knowledge enters Orion only after an inbox action.
 """
 from __future__ import annotations
 
@@ -25,9 +26,10 @@ def register() -> None:
 
     orion.add_agent(
         "treasurer", "Treasurer", tagline="Personal finance",
-        blurb="Reads FinStrive without changing it, learns what normal spending looks like for "
-              "you, and explains material changes with evidence and confidence. Its models run "
-              "locally; hypotheses become lasting knowledge only when you approve them.",
+        blurb="Scans bank alerts into FinStrive's reconciliation queue, learns what normal "
+              "spending looks like for you, and explains material changes with evidence and "
+              "confidence. Its models run locally; hypotheses become lasting knowledge only "
+              "when you approve them.",
         icon="wallet-cards", accent="observation", plugin="finance", order=35,
         summary=_summary, detail=_detail)
     orion.add_specialist(FinanceSpecialist())
@@ -44,6 +46,10 @@ def register() -> None:
     orion.add_job("treasurer_refresh", "0 */4 * * *", engine.refresh, agent="treasurer",
                   label="Refresh FinStrive",
                   description="Reads new transactions and refreshes Treasurer's local aggregate cache.")
+    orion.add_job("treasurer_scan_mailbox", "*/30 * * * *", engine.scan_mailbox,
+                  agent="treasurer", label="Scan bank alerts",
+                  description="Asks FinStrive to turn recent HDFC transaction emails into "
+                              "unmapped reconciliation entries.")
     orion.add_job("treasurer_analyze", "0 7 * * *", engine.analyze, agent="treasurer",
                   label="Find financial patterns",
                   description="Runs personal baselines and ML anomaly models, then asks the LLM "
@@ -73,7 +79,7 @@ def status() -> dict[str, Any]:
         "ok": snap is not None and not error,
         "state": "ready" if snap and not error else "cached" if snap else "waiting",
         "reason": error or ("Ready." if snap else "Run an analysis after FinStrive is available."),
-        "source": "FinStrive read-only transaction API",
+        "source": "FinStrive transactions + reconciliation-candidate mailbox sync",
         "cached_at": snap.get("cached_at") if snap else None,
         "latest_transaction_at": snap.get("latest_transaction_at") if snap else None,
         "model": model,

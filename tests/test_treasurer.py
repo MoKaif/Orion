@@ -3,9 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 import json
+import httpx
 from datetime import date, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from plugins.finance import analytics, engine, inference, models, source, store
 
@@ -70,6 +71,43 @@ class TreasurerSemanticsTests(unittest.TestCase):
             self.assertEqual(models.unusual_transactions([], minimum_amount=1000), [])
 
 
+class TreasurerSourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_mailbox_scan_uses_narrow_endpoint_and_short_lookback(self):
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["method"] = request.method
+            seen["path"] = request.url.path
+            seen["lookback"] = request.url.params.get("lookbackDays")
+            return httpx.Response(200, json={
+                "scanned": 8, "matched": 5, "created": 2,
+                "duplicates": 3, "ignored": 3,
+            })
+
+        transport = httpx.MockTransport(handler)
+        real_client = httpx.AsyncClient
+
+        def client(*args, **kwargs):
+            return real_client(*args, transport=transport, **kwargs)
+
+        cfg = {"finstrive": {
+            "base_url": "http://finstrive.test:5101",
+            "mail_sync_path": "/api/transactions/sync-email-transactions",
+            "mail_sync_lookback_days": 2,
+            "timeout_seconds": 5,
+        }}
+        with (patch.object(source, "settings", return_value=cfg),
+              patch.object(source.httpx, "AsyncClient", side_effect=client)):
+            result = await source.scan_transaction_emails()
+
+        self.assertEqual(result["created"], 2)
+        self.assertEqual(seen, {
+            "method": "POST",
+            "path": "/api/transactions/sync-email-transactions",
+            "lookback": "2",
+        })
+
+
 class TreasurerStoreTests(unittest.TestCase):
     def test_insight_lifecycle_and_user_feedback_are_durable(self):
         old_db, old_ready = store._DB, store._READY
@@ -118,6 +156,26 @@ class TreasurerEngineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNotNone(store.latest_snapshot(c))
                 self.assertIsNotNone(store.latest_model_run(c))
                 self.assertGreater(len(store.insights(c)), 0)
+                c.close()
+        finally:
+            store._DB, store._READY = old_db, old_ready
+
+    async def test_mailbox_runner_persists_finstrive_sync_counters(self):
+        old_db, old_ready = store._DB, store._READY
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                store._DB = Path(tmp) / "treasurer.db"
+                store._READY = False
+                counters = {"scanned": 8, "matched": 5, "created": 2,
+                            "duplicates": 3, "ignored": 3}
+                with (patch.object(source, "scan_transaction_emails",
+                                   new=AsyncMock(return_value=counters)),
+                      patch.object(engine, "settings", return_value={"enabled": True})):
+                    result = await engine.scan_mailbox()
+                self.assertEqual(result, {"ok": True, **counters})
+                c = store.conn()
+                self.assertEqual(json.loads(store.get_meta(c, "last_mail_sync")), counters)
+                self.assertEqual(store.get_meta(c, "last_mail_sync_error"), "")
                 c.close()
         finally:
             store._DB, store._READY = old_db, old_ready

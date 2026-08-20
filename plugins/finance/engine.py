@@ -48,6 +48,29 @@ async def refresh() -> dict[str, Any]:
                 "cached_at": cached.get("cached_at") if cached else None}
 
 
+async def scan_mailbox() -> dict[str, Any]:
+    """Create unmapped FinStrive candidates from recent HDFC transaction alerts."""
+    if not settings().get("enabled", True):
+        raise RuntimeError("Treasurer is disabled in config/treasurer.json")
+    try:
+        counters = await source.scan_transaction_emails()
+        c = store.conn()
+        try:
+            store.set_meta(c, "last_mail_sync", json.dumps(counters, sort_keys=True))
+            store.set_meta(c, "last_mail_sync_error", "")
+        finally:
+            c.close()
+        return {"ok": True, **counters}
+    except Exception as exc:
+        c = store.conn()
+        try:
+            store.set_meta(c, "last_mail_sync_error", f"{type(exc).__name__}: {str(exc)[:300]}")
+        finally:
+            c.close()
+        log.warning("Treasurer mailbox scan failed (%s): %s", type(exc).__name__, exc)
+        raise
+
+
 async def analyze(*, use_llm: bool = True) -> dict[str, Any]:
     try:
         payload, rows = await collect()
