@@ -37,7 +37,8 @@ dispatch/compress/embed stay local on Ollama + fastembed. The on-host smoke test
 (`scripts/smoke_test.py`): live fastembed + sqlite-vec recall, a real Ollama turn, and a full
 end-to-end pipeline run.
 
-Next: content plugins (operations / finance / health / calendar) and a Pi/voice client.
+Next: content plugins (operations / calendar) and a Pi/voice client. Vitalist now reads Perseus
+for evidence-backed daily and weekly health insights delivered through Herald.
 
 ## Run
 

@@ -1,0 +1,17 @@
+{
+  "//": "Vitalist reads Perseus over HTTP and gives its computed facts to Orion's prose model.",
+  "enabled": true,
+  "timezone": "Asia/Kolkata",
+  "perseus": {
+    "//": "Override with PERSEUS_BASE_URL when Perseus is not on this loopback address.",
+    "base_url": "http://127.0.0.1:8080",
+    "timeout_seconds": 12
+  },
+  "analysis": {
+    "history_days": 30
+  },
+  "llm": {
+    "//": "Only aggregates/comparisons are sent to the configured Orion provider; never raw samples.",
+    "enabled": true
+  }
+}

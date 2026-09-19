@@ -10,15 +10,21 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
-## [Unreleased]
+## [0.12.0] — 2026-09-19
+
+Add Vitalist health insights agent
 
 ### Added
+- Vitalist agent, health specialist, and read-only Perseus summary tool.
+- Daily and weekly evidence-backed health reports for Herald.
 - Treasurer can ask FinStrive to scan recent HDFC transaction-alert emails and
   create unmapped reconciliation candidates every 30 minutes.
 - Mailbox scan results and failures are retained in Treasurer's job history for
   review in the Orion UI.
 
 ### Changed
+- Health prose is constrained to deterministic Perseus comparisons and degrades
+  to cached facts.
 - Treasurer's FinStrive integration now exposes one narrowly scoped mutation:
   the reconciliation-candidate mailbox scan. It still cannot map, skip, edit or
   delete transactions.

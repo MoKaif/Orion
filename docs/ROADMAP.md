@@ -117,7 +117,10 @@ reference implementation.
 
 ## Beyond M5 — expansion (each item is one plugin / one interface, no core work)
 
-- [ ] Content plugins: `operations`, `health`, `calendar` specialists + tools.
+- [x] **Vitalist / health** (`plugins/health/`) — reads Perseus over HTTP, computes daily and
+      weekly personal-baseline comparisons, constrains LLM prose to those facts, and contributes
+      the resulting account to Herald without making medical claims.
+- [ ] Content plugins: `operations`, `calendar` specialists + tools.
 - [x] **Treasurer / finance** (`plugins/finance/`) — reads FinStrive without changing it,
       learns personal expected-spending ranges locally, detects category and transaction
       anomalies, constrains LLM interpretation to computed evidence, and contributes findings

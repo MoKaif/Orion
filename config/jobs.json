@@ -23,6 +23,9 @@
     "treasurer_analyze": { "enabled": true, "cron": "0 7 * * *", "//": "Treasurer · model spending before Herald" },
     "treasurer_train":   { "enabled": true, "cron": "30 6 * * 0", "//": "Treasurer · weekly model validation" },
 
+    "vitalist_daily":  { "enabled": true, "cron": "45 6 * * *", "//": "Vitalist · yesterday vs personal baseline" },
+    "vitalist_weekly": { "enabled": true, "cron": "15 8 * * 1", "//": "Vitalist · seven-day health pattern before Herald" },
+
     "morning_briefing": { "enabled": true, "cron": "30 7 * * *", "//": "Herald · the daily letter" },
     "herald_alerts":    { "enabled": true, "cron": "*/30 * * * *", "//": "Herald · quiet unless something broke" },
     "weekly_letter":    { "enabled": true, "cron": "0 9 * * 1",  "//": "Herald · Mondays 09:00" },

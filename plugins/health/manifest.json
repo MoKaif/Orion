@@ -1,0 +1,20 @@
+{
+  "//": "Vitalist — evidence-backed daily and weekly health interpretation from Perseus.",
+  "name": "health",
+  "version": "1.0.0",
+  "specialists": ["health"],
+  "agents": ["vitalist"],
+  "tools": ["health_summary"],
+  "entity_types": [],
+  "relationship_types": [],
+  "background_jobs": [
+    { "name": "vitalist_daily", "cron": "45 6 * * *" },
+    { "name": "vitalist_weekly", "cron": "15 8 * * 1" }
+  ],
+  "api_routes": [
+    "/plugins/health/status",
+    "/plugins/health/reports/latest"
+  ],
+  "dashboard_widgets": ["vitalist_health"],
+  "permissions": ["read_perseus_health", "derive_health_insights"]
+}
