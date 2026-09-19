@@ -37,7 +37,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       <nav className="rail">
         <div className="brand">
           <span className="brand-mark">
-            <img src="/brand/orion-mark.svg" alt="" />
+            <img src="/assets/orion-mark.svg" alt="" />
           </span>
           <div>
             <div className="brand-name">Orion</div>

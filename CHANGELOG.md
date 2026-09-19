@@ -10,6 +10,13 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.13.1] — 2026-09-20
+
+Serve Orion brand assets in production
+
+### Fixed
+- Move the logo and favicon under the mounted SPA asset path
+
 ## [0.13.0] — 2026-09-20
 
 Redesign the Orion web interface

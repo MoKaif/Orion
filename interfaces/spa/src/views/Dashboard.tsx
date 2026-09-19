@@ -36,7 +36,7 @@ export default function Dashboard() {
             <Link className="btn" to="/agents"><Bot size={14}/> View agents</Link>
           </div>
         </div>
-        <div className="dash-orbit" aria-hidden="true"><img src="/brand/orion-mark.svg" alt="" /></div>
+        <div className="dash-orbit" aria-hidden="true"><img src="/assets/orion-mark.svg" alt="" /></div>
         <div className="dash-live"><Radio size={13}/><span>{online} providers online</span><i/><b>{inbox?.length ?? 0} waiting</b></div>
       </section>
 

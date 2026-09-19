@@ -107,7 +107,7 @@ export default function Chat() {
       <div className="chat-log">
         {messages.length === 0 && (
           <div className="chat-empty">
-            <span className="chat-orbit"><img src="/brand/orion-mark.svg" alt="" /></span>
+            <span className="chat-orbit"><img src="/assets/orion-mark.svg" alt="" /></span>
             <p className="eyebrow">Your second brain</p>
             <h2>What are we thinking through?</h2>
             <p>Orion begins with your world model, then chooses the right specialist and tools.</p>
