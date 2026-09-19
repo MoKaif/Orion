@@ -318,3 +318,75 @@
   border-color: var(--copper);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--copper) 20%, transparent);
 }
+
+/* Orion brand pass: denser scanning, clearer hierarchy, fewer full-width dead zones. */
+.tabs {
+  width: fit-content;
+  max-width: 100%;
+  gap: 5px;
+  margin-bottom: 18px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--inset);
+}
+.tab {
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.tab.active {
+  color: var(--primary-2);
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--line));
+  background: color-mix(in srgb, var(--primary) 11%, var(--panel));
+  box-shadow: var(--shadow-sm);
+}
+.inbox-groups { gap: 14px; }
+.inbox-group {
+  border-radius: 17px;
+  box-shadow: var(--shadow-sm);
+}
+.group-head {
+  min-height: 50px;
+  padding: 11px 15px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--bg-2));
+}
+.group-src { font-family: var(--sans); font-size: 11.5px; font-weight: 650; }
+.group-count { font-family: var(--sans); }
+.item-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+.inbox-item {
+  min-width: 0;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  gap: 11px;
+}
+.inbox-item:nth-child(2n) { border-right: 0; }
+.item-title { font-family: var(--sans); font-size: 14px; font-weight: 650; }
+.item-body { font-size: 13px; line-height: 1.55; }
+.item-effect { margin-top: auto; border-radius: 10px; }
+.item-actions { flex-wrap: wrap; }
+.kind-badge { font-family: var(--sans); border-radius: 999px; }
+.answer-input { min-height: 66px; padding: 10px 11px; border-radius: 10px; }
+
+@media (max-width: 920px) {
+  .item-list { grid-template-columns: 1fr; }
+  .inbox-item { border-right: 0; }
+}
+@media (max-width: 560px) {
+  .tabs { width: 100%; }
+  .tab { flex: 0 0 auto; }
+  .group-src { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .group-count { display: none; }
+  .answer { align-items: stretch; flex-direction: column; }
+  .answer .btn { align-self: flex-end; }
+}

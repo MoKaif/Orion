@@ -1,13 +1,14 @@
 /* knowledge classification stamp */
 .stamp {
-  display: inline-block;
-  font: 700 9.5px/1 var(--mono);
-  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  font: 700 9px/1 var(--sans);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 4px 6px 3px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
-  transform: rotate(-3deg);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .stamp-fact {
   color: var(--fact);
@@ -21,13 +22,13 @@
 
 /* agent provenance chip */
 .agent-chip {
-  font: 700 9px/1 var(--mono);
+  font: 700 9px/1 var(--sans);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   padding: 4px 7px 3px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
-  transform: rotate(-1.5deg);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
   color: var(--faint);
   white-space: nowrap;
 }

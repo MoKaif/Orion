@@ -10,7 +10,10 @@ function providerDollars(usage: Record<string, unknown>): string {
     if (typeof v === "number") total += v;
     else if (v && typeof v === "object") Object.values(v).forEach(walk);
   };
-  if (today && typeof today === "object" && "cost" in today) walk((today as any).cost);
+  if (today && typeof today === "object") {
+    if ("cost_usd" in today) walk(today.cost_usd);
+    else if ("cost" in today) walk(today.cost);
+  }
   return total > 0 ? `$${total.toFixed(3)}` : "$0.00";
 }
 

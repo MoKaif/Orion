@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Orion">
+  <defs>
+    <linearGradient id="orbit" x1="16" y1="17" x2="109" y2="110" gradientUnits="userSpaceOnUse"><stop stop-color="#EAF2FF"/><stop offset=".42" stop-color="#82AAFF"/><stop offset="1" stop-color="#6078FF"/></linearGradient>
+    <radialGradient id="planet" cx="0" cy="0" r="1" gradientTransform="translate(51 44) rotate(51) scale(54)" gradientUnits="userSpaceOnUse"><stop stop-color="#B9D2FF"/><stop offset=".22" stop-color="#5F87D8"/><stop offset=".55" stop-color="#182A50"/><stop offset="1" stop-color="#050A13"/></radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <circle cx="58" cy="65" r="28" fill="url(#planet)" stroke="#6C8ED0" stroke-opacity=".35"/>
+  <path d="M101 37A49 49 0 1 0 107 55" fill="none" stroke="url(#orbit)" stroke-width="5.5" stroke-linecap="round"/>
+  <circle cx="104" cy="31" r="6.5" fill="#A9C7FF" filter="url(#glow)"/>
+</svg>

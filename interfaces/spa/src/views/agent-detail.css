@@ -770,3 +770,53 @@
   color: var(--faint);
   white-space: nowrap;
 }
+
+/* Unified agent workspace: the identity, controls and output read as one product surface. */
+.agent-page { max-width: 1260px; margin: 0 auto; }
+.back { font-family: var(--sans); font-weight: 650; }
+.ap-head {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(130deg, color-mix(in srgb, var(--accent) 9%, var(--panel)), var(--panel) 58%);
+  box-shadow: var(--shadow-sm);
+}
+.ap-mark { width: 50px; height: 50px; border-radius: 15px; }
+.ap-tagline { font-family: var(--sans); font-weight: 750; }
+.ap-id h1 { font-family: var(--sans); font-size: clamp(27px, 3vw, 36px); font-weight: 670; letter-spacing: -.035em; }
+.ap-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, auto)) minmax(240px, 1fr);
+  align-items: center;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.ap-metric b { font-family: var(--sans); font-size: 21px; font-weight: 700; }
+.ap-metric span { font-family: var(--sans); font-weight: 700; }
+.ap-section { font-family: var(--sans); font-size: 16px; font-weight: 700; }
+.pass-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pass { min-width: 0; padding: 16px; border-left-width: 3px; border-radius: 14px; }
+.pass-head h3 { font-family: var(--sans); font-size: 15px; font-weight: 680; }
+.pass-state, .ctl-label, .ctl-hint, .saved, .pass-result { font-family: var(--sans); }
+.pass-controls { border-top-style: solid; }
+.proposal-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.proposal { border-radius: 14px; }
+.memory-interview { border-left: 0; border-top: 3px solid var(--primary); border-radius: 16px; }
+.memory-interview-head h2, .memory-cue blockquote { font-family: var(--sans); }
+.memory-cue blockquote { font-weight: 560; }
+
+@media (max-width: 900px) {
+  .ap-strip { grid-template-columns: repeat(3, 1fr); }
+  .ap-shift { grid-column: 1 / -1; width: 100%; margin: 0; }
+  .pass-list, .proposal-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .ap-head { padding: 16px; }
+  .ap-strip { grid-template-columns: repeat(2, 1fr); padding: 13px; }
+  .ap-id h1 { font-size: 27px; }
+  .ap-mark { width: 44px; height: 44px; }
+  .pass { padding: 14px; }
+}

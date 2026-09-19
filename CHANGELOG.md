@@ -10,6 +10,19 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.13.0] — 2026-09-20
+
+Redesign the Orion web interface
+
+### Added
+- New Orion orbital brand assets and favicon
+
+### Changed
+- Rebuilt the responsive dashboard, navigation, chat, inbox, agents, sessions, and agent workspaces around a denser brand system
+
+### Fixed
+- Correct provider cost display and reduce wasted dashboard space
+
 ## [0.12.0] — 2026-09-19
 
 Add Vitalist health insights agent

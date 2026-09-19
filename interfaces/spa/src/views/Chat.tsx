@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import { SendHorizonal, Loader2 } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { SendHorizonal, Loader2, Plus, Sparkles } from "lucide-react";
 import "./chat.css";
 
 interface Msg {
@@ -101,13 +101,21 @@ export default function Chat() {
         <p className="view-note">
           Orion consults your world model before answering, and mines each turn for new knowledge.
         </p>
+        {sessionId && <Link to="/chat" className="btn btn-sm chat-new"><Plus size={13}/> New chat</Link>}
       </header>
 
       <div className="chat-log">
         {messages.length === 0 && (
-          <div className="empty-state">
-            <span className="empty-glyph">◆</span>
-            <p>Ask Orion anything. It knows what you've told it.</p>
+          <div className="chat-empty">
+            <span className="chat-orbit"><img src="/brand/orion-mark.svg" alt="" /></span>
+            <p className="eyebrow">Your second brain</p>
+            <h2>What are we thinking through?</h2>
+            <p>Orion begins with your world model, then chooses the right specialist and tools.</p>
+            <div className="chat-suggestions">
+              {["What needs my attention today?", "What changed across my projects?", "Summarize what you know about my health", "Connect recent ideas I may have missed"].map((prompt) => (
+                <button key={prompt} onClick={() => setInput(prompt)}><Sparkles size={12}/>{prompt}</button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m, i) => (
@@ -126,6 +134,10 @@ export default function Chat() {
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onInput={(e) => {
+            e.currentTarget.style.height = "auto";
+            e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 160)}px`;
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) send(e);
           }}

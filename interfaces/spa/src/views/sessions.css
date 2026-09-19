@@ -2,38 +2,73 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
 }
+
 .session-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
-  padding: 13px 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  min-height: 90px;
+  padding: 15px;
   color: var(--fg);
-  transition: border-color 0.14s;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 5%, var(--panel)), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
-.session-row:hover {
-  border-color: var(--copper);
+
+.session-row:hover,
+.session-row:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--line));
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  outline: none;
 }
-.session-row svg {
-  color: var(--copper);
+
+.session-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border-radius: 12px;
 }
+
+.session-copy { min-width: 0; }
 .session-title {
-  font-size: 14px;
-  font-weight: 500;
-}
-.session-meta {
-  margin-left: auto;
-  font: 500 11px/1 var(--mono);
-  color: var(--faint);
+  display: block;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .session-date {
-  font: 500 11px/1 var(--mono);
+  display: block;
+  margin-top: 5px;
   color: var(--faint);
+  font-size: 11px;
   white-space: nowrap;
+}
+.session-meta {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.session-arrow { color: var(--primary); opacity: 0.55; transition: transform 0.16s ease, opacity 0.16s ease; }
+.session-row:hover .session-arrow { opacity: 1; transform: translate(2px, -2px); }
+
+@media (max-width: 720px) {
+  .session-list { grid-template-columns: 1fr; }
+  .session-row { min-height: 82px; padding: 13px; }
+  .session-meta { display: none; }
 }

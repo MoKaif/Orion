@@ -17,10 +17,10 @@ export default function ThemeToggle() {
     <button
       className="btn btn-ghost theme-toggle"
       onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-      title={theme === "dark" ? "Switch to reading room" : "Switch to obsidian"}
+      title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
     >
       {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-      <span>{theme === "dark" ? "Reading room" : "Obsidian"}</span>
+      <span>{theme === "dark" ? "Light theme" : "Dark theme"}</span>
     </button>
   );
 }

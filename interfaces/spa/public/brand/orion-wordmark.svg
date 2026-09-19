@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 88" role="img" aria-label="Orion Knowledge OS">
+  <defs><linearGradient id="o" x1="3" y1="3" x2="73" y2="77" gradientUnits="userSpaceOnUse"><stop stop-color="#EAF2FF"/><stop offset=".48" stop-color="#82AAFF"/><stop offset="1" stop-color="#6078FF"/></linearGradient><radialGradient id="p" cx="0" cy="0" r="1" gradientTransform="translate(34 28) rotate(50) scale(39)" gradientUnits="userSpaceOnUse"><stop stop-color="#AFCBFF"/><stop offset=".35" stop-color="#4569A9"/><stop offset="1" stop-color="#070C17"/></radialGradient></defs>
+  <g transform="translate(4 4)"><circle cx="36" cy="40" r="20" fill="url(#p)"/><path d="M67 20A35 35 0 1 0 71 34" fill="none" stroke="url(#o)" stroke-width="4" stroke-linecap="round"/><circle cx="69" cy="16" r="4.5" fill="#A9C7FF"/></g>
+  <text x="91" y="46" fill="#E5E7EB" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="500" letter-spacing="1">Orion</text><text x="93" y="66" fill="#8B98AE" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="600" letter-spacing="4">KNOWLEDGE OS</text>
+</svg>

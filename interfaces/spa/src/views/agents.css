@@ -1,20 +1,19 @@
-/* Agents view — one card per agent, nothing to operate. Cards are index cards in the archive:
-   a tabbed corner mark, the agent's own accent as a top edge, and its working day at the foot. */
+/* Dense specialist directory. Each agent keeps its registered accent while sharing Orion's shell. */
 
 .agent-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
 }
 
 .agent-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 300px;
-  padding: 20px 22px 18px;
+  min-height: 270px;
+  padding: 18px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 18px;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--accent) 5%, var(--panel)) 0%,
@@ -30,13 +29,13 @@
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent), transparent 78%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--primary) 45%, transparent), transparent 82%);
 }
 .agent-card:hover,
 .agent-card:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow);
   outline: none;
 }
@@ -53,9 +52,9 @@
 }
 .ac-mark {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   color: var(--accent);
@@ -66,16 +65,16 @@
   min-width: 0;
 }
 .ac-tagline {
-  font: 600 9px/1 var(--mono);
+  font: 700 9px/1 var(--sans);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--accent);
   margin: 2px 0 5px;
 }
 .ac-name h2 {
-  font-family: var(--serif);
-  font-size: 21px;
-  font-weight: 500;
+  font-family: var(--sans);
+  font-size: 19px;
+  font-weight: 700;
   margin: 0;
   letter-spacing: 0.01em;
 }
@@ -89,7 +88,7 @@
   border-radius: 20px;
   border: 1px solid var(--line);
   background: var(--inset);
-  font: 500 10.5px/1 var(--mono);
+  font: 650 10px/1 var(--sans);
   color: var(--faint);
   white-space: nowrap;
 }
@@ -109,8 +108,8 @@
 .ac-blurb {
   margin: 0 0 16px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.62;
+  font-size: 13.5px;
+  line-height: 1.55;
   max-width: 46ch;
 }
 
@@ -121,7 +120,7 @@
   gap: 6px 22px;
   margin: 0;
   padding: 13px 0 0;
-  border-top: 1px dotted var(--line-2);
+  border-top: 1px solid var(--line);
 }
 .ac-metrics div {
   display: flex;
@@ -130,12 +129,12 @@
 }
 .ac-metrics dd {
   margin: 0;
-  font: 500 17px/1 var(--serif);
+  font: 700 17px/1 var(--sans);
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
 .ac-metrics dt {
-  font: 500 9.5px/1 var(--mono);
+  font: 650 9px/1 var(--sans);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--faint);
@@ -148,7 +147,7 @@
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font: 500 11px/1.3 var(--mono);
+  font: 550 11px/1.3 var(--sans);
   color: var(--muted);
 }
 .ac-count em {

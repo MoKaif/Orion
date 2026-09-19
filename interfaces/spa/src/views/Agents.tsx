@@ -10,7 +10,9 @@ import {
   CircleAlert,
   PauseCircle,
   GitPullRequest,
+  HeartPulse,
   LucideIcon,
+  WalletCards,
 } from "lucide-react";
 import { AgentCard, useAgents } from "../api";
 import { Loading } from "../components/bits";
@@ -25,6 +27,8 @@ const ICONS: Record<string, LucideIcon> = {
   mail: Mail,
   bot: Bot,
   "git-pull-request": GitPullRequest,
+  "heart-pulse": HeartPulse,
+  "wallet-cards": WalletCards,
 };
 
 /** One state line per agent, in priority order — never two competing signals at once. */
@@ -111,6 +115,7 @@ export default function Agents() {
           The work Orion does while you're away. Open one to run a pass by hand or change when it
           works.
         </p>
+        <span className="view-count">{data.length} active specialists</span>
       </header>
 
       {data.length === 0 ? (

@@ -6,7 +6,6 @@ import {
   Bot,
   MessagesSquare,
   History,
-  Sparkles,
 } from "lucide-react";
 import { useInbox } from "../api";
 import Telemetry from "./Telemetry";
@@ -38,11 +37,11 @@ export default function Shell({ children }: { children: ReactNode }) {
       <nav className="rail">
         <div className="brand">
           <span className="brand-mark">
-            <Sparkles size={17} strokeWidth={2.2} />
+            <img src="/brand/orion-mark.svg" alt="" />
           </span>
           <div>
             <div className="brand-name">Orion</div>
-            <div className="brand-sub">Knowledge OS</div>
+            <div className="brand-sub">KNOWLEDGE OS</div>
           </div>
         </div>
 
