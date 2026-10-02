@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { SendHorizonal, Loader2, Plus, Sparkles } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { SendHorizonal, Plus, Sparkles, Square } from "lucide-react";
 import "./chat.css";
 
 interface Msg {
@@ -9,6 +9,7 @@ interface Msg {
 }
 
 export default function Chat() {
+  const navigate = useNavigate();
   const { sessionId: sessionParam } = useParams();
   const [sessionId, setSessionId] = useState<number | null>(
     sessionParam ? Number(sessionParam) : null,
@@ -18,6 +19,7 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!sessionParam) return;
@@ -27,9 +29,27 @@ export default function Chat() {
       .catch(() => {});
   }, [sessionParam]);
 
+  useEffect(() => () => requestRef.current?.abort(), []);
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth" });
   }, [messages, streaming]);
+
+  function newChat() {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setSessionId(null);
+    setMessages([]);
+    setInput("");
+    setStreaming(false);
+    setStatus("");
+    navigate("/chat", { replace: true });
+  }
+
+  function stop() {
+    setStatus("stopping…");
+    requestRef.current?.abort();
+  }
 
   async function send(e: FormEvent) {
     e.preventDefault();
@@ -38,14 +58,18 @@ export default function Chat() {
     setInput("");
     setMessages((m) => [...m, { role: "user", content: text }, { role: "assistant", content: "" }]);
     setStreaming(true);
-    setStatus("thinking…");
+    setStatus("consulting memory…");
+    const controller = new AbortController();
+    requestRef.current = controller;
 
     try {
       const res = await fetch("/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, session_id: sessionId }),
+        signal: controller.signal,
       });
+      if (!res.ok || !res.body) throw new Error(`chat request failed (${res.status})`);
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -64,7 +88,10 @@ export default function Chat() {
           } catch {
             continue;
           }
-          if (ev.type === "start" && ev.session_id) setSessionId(ev.session_id);
+          if (ev.type === "start" && ev.session_id) {
+            setSessionId(ev.session_id);
+            window.history.replaceState({}, "", `/chat/${ev.session_id}`);
+          }
           else if (ev.type === "token")
             setMessages((m) => {
               const copy = [...m];
@@ -74,18 +101,25 @@ export default function Chat() {
               };
               return copy;
             });
-          else if (ev.type === "mode") setStatus(`${ev.mode || ""} ${ev.specialist || ""}`.trim());
+          else if (ev.type === "context") setStatus(`${ev.mode || ""} · ${ev.specialist || "generalist"}`);
           else if (ev.type === "tool") setStatus(`using ${ev.tool || "a tool"}…`);
+          else if (ev.type === "fallback") setStatus(`switched to ${ev.answered_by || "fallback"}…`);
+          else if (ev.type === "error") throw new Error(ev.message || "chat failed");
           else if (ev.type === "done") setStatus("");
         }
       }
     } catch {
-      setMessages((m) => {
-        const copy = [...m];
-        copy[copy.length - 1] = { role: "assistant", content: "⚠️ connection interrupted." };
-        return copy;
-      });
+      if (!controller.signal.aborted) {
+        setInput(text);
+        setMessages((m) => {
+          const copy = [...m];
+          const last = copy[copy.length - 1];
+          if (!last.content) last.content = "Connection interrupted — your message is restored below.";
+          return copy;
+        });
+      }
     } finally {
+      if (requestRef.current === controller) requestRef.current = null;
       setStreaming(false);
       setStatus("");
     }
@@ -101,7 +135,7 @@ export default function Chat() {
         <p className="view-note">
           Orion consults your world model before answering, and mines each turn for new knowledge.
         </p>
-        {sessionId && <Link to="/chat" className="btn btn-sm chat-new"><Plus size={13}/> New chat</Link>}
+        {sessionId && <button type="button" onClick={newChat} className="btn btn-sm chat-new"><Plus size={13}/> New chat</button>}
       </header>
 
       <div className="chat-log">
@@ -144,8 +178,14 @@ export default function Chat() {
           placeholder="Message Orion…"
           rows={1}
         />
-        <button className="btn btn-primary" disabled={streaming || !input.trim()}>
-          {streaming ? <Loader2 size={15} className="spin" /> : <SendHorizonal size={15} />}
+        <button
+          type={streaming ? "button" : "submit"}
+          className={`btn btn-primary${streaming ? " chat-stop" : ""}`}
+          disabled={!streaming && !input.trim()}
+          onClick={streaming ? stop : undefined}
+          aria-label={streaming ? "Stop response" : "Send message"}
+        >
+          {streaming ? <Square size={13} fill="currentColor" /> : <SendHorizonal size={15} />}
         </button>
       </form>
     </div>

@@ -38,11 +38,11 @@ class LocalModelGate:
             if self._fg == 0:
                 self._idle.set()
 
-    async def run_background(self, coro, *, preemptible: bool = True) -> bool:
-        """Run a background coroutine, waiting for idle first. Returns False if preempted."""
+    async def run_background(self, work, *, preemptible: bool = True) -> bool:
+        """Run background work once idle; a callable defers coroutine creation until then."""
         async def runner():
             await self._idle.wait()
-            await coro
+            await (work() if callable(work) else work)
 
         task = asyncio.create_task(runner())
         if preemptible:

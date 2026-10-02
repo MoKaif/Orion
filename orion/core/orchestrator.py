@@ -10,6 +10,7 @@ the constitution's confirm gate for irreversible actions, and cognitive-mode-dri
 """
 from __future__ import annotations
 
+import asyncio
 import itertools
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable
@@ -30,6 +31,7 @@ from orion.core.world_model.extract import extract_candidates
 # Pending confirmations for irreversible tools (ephemeral, module-level — mirrors the MVP).
 _pending: dict[int, dict[str, Any]] = {}
 _counter = itertools.count(1)
+_post_turn_tasks: set[asyncio.Task] = set()
 
 
 @dataclass
@@ -174,11 +176,20 @@ async def handle_turn(message: str, session_id: int,
         full = "".join(reply)
         world_model.add_message(session_id, "assistant", full)
 
-        for candidate in await extract_candidates(f"User: {message}\nOrion: {full}"):
-            candidate.setdefault("source", f"session:{session_id}")
-            result = world_model.ingest_candidate(candidate)
-            if on_event and result.get("outcome") == "queued":
-                on_event({"type": "review_queued", "review_id": result["review_id"]})
+    # Knowledge mining is useful background maintenance, not part of response latency. Waiting
+    # for the local model here used to keep the browser spinner alive several seconds after the
+    # answer had visibly finished. Run it only once the foreground gate is released; a new chat
+    # can preempt it through the same gate used by scheduled work.
+    task = asyncio.create_task(
+        gate.run_background(lambda: _mine_turn(message, full, session_id)))
+    _post_turn_tasks.add(task)
+    task.add_done_callback(_post_turn_tasks.discard)
+
+
+async def _mine_turn(message: str, reply: str, session_id: int) -> None:
+    for candidate in await extract_candidates(f"User: {message}\nOrion: {reply}"):
+        candidate.setdefault("source", f"session:{session_id}")
+        world_model.ingest_candidate(candidate)
 
 
 async def execute_confirmed(pid: int, approve: bool) -> dict[str, Any]:

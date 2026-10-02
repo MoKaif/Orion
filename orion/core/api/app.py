@@ -5,6 +5,7 @@ extract to review inbox), sessions, the review-inbox lifecycle, and a vault-inge
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -101,15 +102,31 @@ async def chat_stream(body: ChatIn):
     session_id = body.session_id or world_model.create_session()
 
     async def sse():
-        events: list[dict] = []
+        queue: asyncio.Queue[dict] = asyncio.Queue()
+
+        async def produce() -> None:
+            try:
+                async for token in orchestrator.handle_turn(
+                        body.message, session_id, on_event=queue.put_nowait):
+                    await queue.put({"type": "token", "text": token})
+            except Exception:
+                log.exception("chat turn failed")
+                await queue.put({"type": "error", "message": "Orion could not finish this turn."})
+            finally:
+                await queue.put({"type": "done", "session_id": session_id})
+
         yield _frame({"type": "start", "session_id": session_id})
-        async for token in orchestrator.handle_turn(body.message, session_id, on_event=events.append):
-            while events:
-                yield _frame(events.pop(0))
-            yield _frame({"type": "token", "text": token})
-        while events:
-            yield _frame(events.pop(0))
-        yield _frame({"type": "done", "session_id": session_id})
+        producer = asyncio.create_task(produce())
+        try:
+            while True:
+                event = await queue.get()
+                yield _frame(event)
+                if event["type"] == "done":
+                    break
+        finally:
+            if not producer.done():
+                producer.cancel()
+            await asyncio.gather(producer, return_exceptions=True)
 
     return StreamingResponse(sse(), media_type="text/event-stream")
 

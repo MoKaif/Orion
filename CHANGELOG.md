@@ -10,6 +10,17 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.14.1] — 2026-10-02
+
+Make Orion chat responsive
+
+### Added
+- Immediate streaming context and cancellable responses
+
+### Changed
+- Knowledge mining runs after the response instead of blocking completion
+- New chat reliably resets the active session and failed drafts are restored
+
 ## [0.14.0] — 2026-10-02
 
 Add Guardian and refine Orion operations

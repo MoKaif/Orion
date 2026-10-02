@@ -187,7 +187,8 @@ class Scheduler:
 
     async def _dispatch(self, job: ScheduledJob) -> None:
         # background work yields to (and is preempted by) interactive chat.
-        await gate.run_background(self._execute(job), preemptible=job.foreground_preemptible)
+        await gate.run_background(lambda: self._execute(job),
+                                  preemptible=job.foreground_preemptible)
 
     async def run_now(self, name: str) -> dict:
         """Trigger a job off-schedule and wait for it (the scripting/CLI path).
@@ -204,7 +205,7 @@ class Scheduler:
                              f"{job.running_since or job.queued_since})"}
         job.queued_since = datetime.now().isoformat(timespec="seconds")
         try:
-            await gate.run_background(self._execute(job), preemptible=False)
+            await gate.run_background(lambda: self._execute(job), preemptible=False)
         finally:
             job.queued_since = None
         return {"ran": name, "result": job.last_result, "at": job.last_run}
@@ -229,7 +230,7 @@ class Scheduler:
 
     async def _run_requested(self, job: ScheduledJob) -> None:
         try:
-            await gate.run_background(self._execute(job), preemptible=False)
+            await gate.run_background(lambda: self._execute(job), preemptible=False)
         finally:
             job.queued_since = None
 
