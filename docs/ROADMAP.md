@@ -121,19 +121,22 @@ reference implementation.
 
 1. **Chat responsiveness and usability** — measure the foreground path, remove avoidable local
    model latency, and improve cancellation, retry, session handling, and activity feedback.
-2. **Chronos / calendar** — read Google Calendar, identify commitments in approved Obsidian and
-   mail inputs, propose inferred events through the Review Inbox, and write calendar changes only
-   after confirmation.
-3. **Inbound mail intelligence** — add a restricted read-only Gmail/IMAP source that routes
-   relevant facts and proposed actions to Chronos, Treasurer, Maintainer, and the Review Inbox
-   without duplicating the mailbox in Orion.
+2. **Chronos expansion** — extend the shipped Google Calendar and read-only mail foundation to
+   approved Obsidian notes, then improve commitment extraction from real-world messages.
+3. **Inbound mail intelligence** — extend Chronos's restricted read-only IMAP source to route
+   relevant facts and proposed actions to Treasurer, Maintainer, and the Review Inbox without
+   duplicating the mailbox in Orion.
 4. **Mobile access** — expose the responsive interface through Tailscale after the chat and
    calendar surfaces are ready for daily use.
 
 - [x] **Vitalist / health** (`plugins/health/`) — reads Perseus over HTTP, computes daily and
       weekly personal-baseline comparisons, constrains LLM prose to those facts, and contributes
       the resulting account to Herald without making medical claims.
-- [ ] Content plugins: `operations`, `calendar` specialists + tools.
+- [x] **Chronos / calendar** (`plugins/chronos/`) — reads the primary Google Calendar, scans a
+      bounded slice of recent mail read-only in a low-CPU nightly job, proposes explicit
+      commitments through the Review Inbox, and writes private calendar events only after user
+      approval. OAuth credentials and tokens remain outside Git and Docker image layers.
+- [ ] Content plugin: `operations` specialist + tools.
 - [x] **Treasurer / finance** (`plugins/finance/`) — reads FinStrive without changing it,
       learns personal expected-spending ranges locally, detects category and transaction
       anomalies, constrains LLM interpretation to computed evidence, and contributes findings

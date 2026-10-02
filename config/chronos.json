@@ -1,0 +1,20 @@
+{
+  "//": "Chronos reads the primary Google Calendar and proposes mail-derived events for review.",
+  "enabled": true,
+  "timezone": "Asia/Kolkata",
+  "horizon_days": 31,
+  "calendar": {
+    "id": "primary",
+    "client_glob": "client_secret_*.json",
+    "token_file": "google-calendar-token.json"
+  },
+  "mail": {
+    "enabled": true,
+    "host": "imap.gmail.com",
+    "lookback_days": 14,
+    "max_messages": 30,
+    "max_bytes": 65536,
+    "inference_batch": 6,
+    "inference_timeout_seconds": 1800
+  }
+}

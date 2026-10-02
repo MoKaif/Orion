@@ -1,6 +1,8 @@
 # Secrets — never commit API keys (the MVP did; we don't)
 .env
 config/secrets.json
+client_secret_*.json
+config/google-calendar-token.json
 config/*.local.json
 
 # Data & runtime — the whole dir is machine-local state

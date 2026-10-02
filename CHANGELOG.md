@@ -10,6 +10,17 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.15.0] — 2026-10-02
+
+Add Chronos calendar intelligence
+
+### Added
+- Chronos agent with Google Calendar sync, upcoming-schedule chat context, and Herald reporting
+- Read-only IMAP commitment discovery with review-gated private calendar creation
+
+### Changed
+- Run mail inference nightly with a one-thread CPU budget and explicit Ollama cleanup
+
 ## [0.14.1] — 2026-10-02
 
 Make Orion chat responsive

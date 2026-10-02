@@ -60,7 +60,7 @@ orion/
 │   ├── plugins.py           manifest discovery + registration
 │   ├── identity.py          single-user + human-approval gates
 │   └── api/                 FastAPI routes (thin; delegate into core)
-├── plugins/                 knowledge, software, research, operations (+ calendar/finance/health later)
+├── plugins/                 knowledge, software, finance, health, guardian, chronos (+ operations later)
 ├── interfaces/web/          dashboard (mission control) + chat — one backend
 ├── data/                    single SQLite file + fastembed model cache
 └── run.py, orion.service

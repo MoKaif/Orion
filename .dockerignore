@@ -11,6 +11,8 @@ __pycache__/
 data/
 # The API key is bind-mounted from ./config at runtime; never copy it into a layer.
 config/secrets.json
+client_secret_*.json
+config/google-calendar-token.json
 
 # Local reference material — never part of the Orion runtime image.
 odysseus/

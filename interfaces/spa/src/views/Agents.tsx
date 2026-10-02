@@ -14,6 +14,7 @@ import {
   HeartPulse,
   LucideIcon,
   WalletCards,
+  CalendarDays,
 } from "lucide-react";
 import { AgentCard, useAgents } from "../api";
 import { Loading } from "../components/bits";
@@ -31,6 +32,7 @@ const ICONS: Record<string, LucideIcon> = {
   "shield-check": ShieldCheck,
   "heart-pulse": HeartPulse,
   "wallet-cards": WalletCards,
+  "calendar-days": CalendarDays,
 };
 
 /** One state line per agent, in priority order — never two competing signals at once. */

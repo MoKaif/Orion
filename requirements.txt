@@ -20,5 +20,11 @@ scikit-learn
 # Lazy-imported in providers/anthropic.py, so its absence degrades to local Ollama.
 anthropic
 
+# Chronos — installed-app OAuth and Google Calendar API. Credentials/tokens remain in
+# gitignored config files and are bind-mounted into the container.
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+
 # Note: SQLite via stdlib sqlite3 (no extra dep).
 # Note: NO chromadb / torch / sentence-transformers — too heavy for this box.
