@@ -558,15 +558,18 @@ def refresh_prs() -> None:
     if not shutil.which("gh"):
         return
     states: dict[str, str] = {}
-    code, out = run(["gh", "search", "prs", "--author", "@me", "--state", "all", "--limit", "40",
-                     "--json", "url,state"], Path.home(), timeout=60)
-    if code != 0:
-        return
-    try:
-        for pr in json.loads(out or "[]"):
-            states[pr["url"]] = str(pr.get("state", "")).lower()
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return
+    # `gh search prs --state all` is not valid (only open|closed), which left every historical
+    # PR permanently "open" in Orion. Query both supported states and merge the result.
+    for state in ("open", "closed"):
+        code, out = run(["gh", "search", "prs", "--author", "@me", "--state", state,
+                         "--limit", "200", "--json", "url,state"], Path.home(), timeout=60)
+        if code != 0:
+            continue
+        try:
+            for pr in json.loads(out or "[]"):
+                states[pr["url"]] = str(pr.get("state") or state).lower()
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
     if states:
         api("/runner/prs", {"states": states})
 
@@ -590,11 +593,13 @@ def main() -> int:
             "(pacman -S github-cli && gh auth login && gh auth setup-git)")
 
     log(f"runner '{RUNNER}' polling {ORION_URL}")
+    refresh_prs()
     idle = 0
     while True:
         job = api("/runner/claim", {"runner": RUNNER})
         if job.get("task"):
             handle(job)
+            refresh_prs()
             idle = 0
             if args.once:
                 return 0
@@ -603,7 +608,7 @@ def main() -> int:
             log("nothing approved to work on")
             return 0
         idle += 1
-        if idle % 30 == 0:                    # roughly every ten minutes of quiet
+        if idle % 15 == 0:                    # roughly every five minutes of quiet
             refresh_prs()
         time.sleep(POLL_SECONDS)
 

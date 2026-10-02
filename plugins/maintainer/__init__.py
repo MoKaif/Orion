@@ -2,7 +2,7 @@
 
 The other three agents work inside the house: the Conductor keeps the world model in order, the
 Curator edits the vault, Herald carries news out to your inbox. Maintainer touches the projects
-themselves — FinStrive, ArcVe, noxctl, Timepieces, purple-buccaneers.
+themselves — FinStrive, ArcVe, noxctl, Perseus, purple-buccaneers, and Orion itself.
 
 It cannot do that with Orion's own brain, and does not try. A 3B model on a CPU box can classify
 a note; it cannot land a feature. So the work is split by what each tier is actually good at:

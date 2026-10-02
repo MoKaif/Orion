@@ -10,6 +10,7 @@ import {
   CircleAlert,
   PauseCircle,
   GitPullRequest,
+  ShieldCheck,
   HeartPulse,
   LucideIcon,
   WalletCards,
@@ -27,6 +28,7 @@ const ICONS: Record<string, LucideIcon> = {
   mail: Mail,
   bot: Bot,
   "git-pull-request": GitPullRequest,
+  "shield-check": ShieldCheck,
   "heart-pulse": HeartPulse,
   "wallet-cards": WalletCards,
 };

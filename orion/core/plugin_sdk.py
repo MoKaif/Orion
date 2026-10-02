@@ -71,11 +71,13 @@ def add_agent(name: str, title: str, *, tagline: str = "", blurb: str = "",
                                  summary=summary, detail=detail))
 
 
-def add_job(name: str, cron_default: str, run: Callable[[], Awaitable[object]],
+def add_job(name: str, cron_default: str,
+            run: Callable[[], object | Awaitable[object]],
             preemptible: bool = True, agent: str = agents.DEFAULT_AGENT,
             label: str = "", description: str = "", limit_default: int | None = None) -> None:
     """Register an idle-by-default background job. The user can retune its cron in jobs.json.
 
+    Jobs may be synchronous or asynchronous; the scheduler awaits a result only when needed.
     ``agent`` files the job under that agent's card (unknown names fall back to the Conductor,
     so handing a job to another plugin's agent is safe). ``label``/``description`` are what the
     user reads. Set ``limit_default`` when a run is batched — it becomes a tunable "per run"

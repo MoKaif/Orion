@@ -31,13 +31,13 @@
 
   "//caps": "Herald must never become noise: a hard ceiling per day, and digests stay out of",
   "//caps2": "quiet hours. Alerts ignore quiet hours — a failure at 02:00 is worth knowing.",
-  "daily_cap": 6,
+  "daily_cap": 4,
   "quiet_hours": [22, 7],
 
   "//prose": "true = deepseek-v4-flash writes the letter around the figures. Every number is",
   "//prose2": "still rendered deterministically; the model only writes prose. If it is",
   "//prose3": "unavailable the mail still goes out, template-only.",
-  "prose": true,
+  "prose": false,
 
   "alerts": {
     "//": "Event-driven mail. spend_usd fires once a day's cloud cost crosses it.",

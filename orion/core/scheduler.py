@@ -8,6 +8,7 @@ is disabled but jobs can still be triggered on demand (POST /jobs/{name}/run).
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -21,7 +22,7 @@ from orion.core.gate import gate
 
 log = logging.getLogger("orion.scheduler")
 
-Job = Callable[[], Awaitable[object]]
+Job = Callable[[], object | Awaitable[object]]
 
 _RUNS_FILE = config.root() / "data" / "job_runs.json"
 _HISTORY_KEEP = 20   # runs kept per job in the persisted log
@@ -123,7 +124,9 @@ class Scheduler:
         job.running_since = datetime.now().isoformat(timespec="seconds")
         start = time.monotonic()
         try:
-            result = await job.run()
+            result = job.run()
+            if inspect.isawaitable(result):
+                result = await result
             ok = True
         except Exception as e:
             log.warning("job %s failed: %s", job.name, e)

@@ -252,6 +252,22 @@ export interface MaintainerRepo {
   enabled: boolean;
 }
 
+export interface GuardianBackup {
+  name: string;
+  created_at: string;
+  files: number;
+  bytes: number;
+}
+
+export interface GuardianStatus {
+  ok: boolean;
+  problems: string[];
+  databases_checked: number;
+  free_gb: number;
+  latest_backup: GuardianBackup | null;
+  backup_count: number;
+}
+
 export interface TreasurerStatus {
   ok: boolean;
   state: "ready" | "cached" | "waiting";
@@ -329,6 +345,8 @@ export interface AgentDetail {
   finance_snapshot?: FinanceSnapshot;
   finance_insights?: FinanceInsight[];
   finance_model?: FinanceModel | null;
+  guardian?: GuardianStatus;
+  backups?: GuardianBackup[];
 }
 
 export interface JobPatch {

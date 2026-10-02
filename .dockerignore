@@ -12,6 +12,11 @@ data/
 # The API key is bind-mounted from ./config at runtime; never copy it into a layer.
 config/secrets.json
 
+# Local reference material — never part of the Orion runtime image.
+odysseus/
+CHATGPT_PROJECT_CONTEXT.md
+ChatGPT Image Sep 20, 2026, 12_00_57 AM.png
+
 # SPA: node_modules is huge and dist is rebuilt in the node stage — never ship host copies.
 interfaces/spa/node_modules/
 interfaces/spa/dist/

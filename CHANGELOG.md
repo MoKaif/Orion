@@ -10,6 +10,18 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [0.14.0] — 2026-10-02
+
+Add Guardian and refine Orion operations
+
+### Added
+- Guardian backups and health audits
+- Dedicated Herald sender and concise mail
+- Three-task Maintainer cadence with Perseus coverage
+
+### Changed
+- Modern settings controls and reconciled Orion interface
+
 ## [0.13.1] — 2026-09-20
 
 Serve Orion brand assets in production

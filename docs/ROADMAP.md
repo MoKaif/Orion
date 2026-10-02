@@ -5,7 +5,7 @@ over-built ahead of need. Checked against the [Manifesto](./ORION_MANIFESTO.md).
 
 ---
 
-## M0 — Foundation & scaffolding  ← current
+## M0 — Foundation & scaffolding  ✅
 
 Establish the small core, clean boundaries, and a runnable app before any intelligence.
 
@@ -117,6 +117,19 @@ reference implementation.
 
 ## Beyond M5 — expansion (each item is one plugin / one interface, no core work)
 
+### Current priorities
+
+1. **Chat responsiveness and usability** — measure the foreground path, remove avoidable local
+   model latency, and improve cancellation, retry, session handling, and activity feedback.
+2. **Chronos / calendar** — read Google Calendar, identify commitments in approved Obsidian and
+   mail inputs, propose inferred events through the Review Inbox, and write calendar changes only
+   after confirmation.
+3. **Inbound mail intelligence** — add a restricted read-only Gmail/IMAP source that routes
+   relevant facts and proposed actions to Chronos, Treasurer, Maintainer, and the Review Inbox
+   without duplicating the mailbox in Orion.
+4. **Mobile access** — expose the responsive interface through Tailscale after the chat and
+   calendar surfaces are ready for daily use.
+
 - [x] **Vitalist / health** (`plugins/health/`) — reads Perseus over HTTP, computes daily and
       weekly personal-baseline comparisons, constrains LLM prose to those facts, and contributes
       the resulting account to Herald without making medical claims.
@@ -141,6 +154,9 @@ reference implementation.
       (cache-aware pricing table; `usage.json` records tokens + dollars split by model; the
       telemetry rail shows cost-today + a per-model tooltip), and mode→model tiering
       (`providers.anthropic.mode_models`: `reasoning`→Sonnet 5, `deep_work`→Opus 4.8).
+- [x] **Guardian** (`plugins/guardian/`) — model-free daily SQLite/config snapshots, bounded
+      retention, database/config/disk/backup-freshness audits, a mission-control surface, and
+      Herald alerts. Secrets are never copied into backups.
 
 ---
 

@@ -32,3 +32,8 @@ dist/
 .vscode/
 *.swp
 .DS_Store
+# Locally cloned reference repository.
+odysseus/
+# Local planning and visual-reference material; not runtime source.
+CHATGPT_PROJECT_CONTEXT.md
+ChatGPT Image Sep 20, 2026, 12_00_57 AM.png

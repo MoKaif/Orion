@@ -27,13 +27,9 @@ def facts(scope: str) -> dict[str, Any]:
     c = store.conn()
     try:
         runs = store.runs(c, limit=50, since_hours=_window(scope))
-        prs = store.open_prs(c)
         waiting = store.proposed(c)
         return {
             "maintainer": {
-                "pull_requests_awaiting_review": len(prs),
-                "pull_requests": [{"repo": p["repo"], "title": p["title"], "url": p["pr_url"]}
-                                  for p in prs[:8]],
                 "runs": len(runs),
                 "runs_failed": len([r for r in runs if r["status"] == "failed"]),
                 "verification_failed": len([r for r in runs if r["verify"] == "failed"]),
@@ -50,23 +46,14 @@ def sections(scope: str) -> list[dict[str, Any]]:
     c = store.conn()
     try:
         runs = store.runs(c, limit=50, since_hours=_window(scope))
-        prs = store.open_prs(c)
         waiting = store.proposed(c)
     finally:
         c.close()
 
-    if not runs and not prs and not waiting:
+    if not runs and not waiting:
         return []                                  # a silent agent gets no section
 
     out: list[dict[str, Any]] = []
-    if prs:
-        out.append({
-            "heading": "Pull requests waiting on you",
-            "rows": [(f"{p['repo']} · {p['title'][:60]}", _verdict(p)) for p in prs[:8]],
-            "accent": _ATTENTION,
-            "note": "Review and merge on GitHub. Orion cannot merge — that stays your hand.",
-        })
-
     if runs:
         failed = [r for r in runs if r["status"] == "failed"]
         changed = sum(r["files_changed"] for r in runs)
@@ -83,24 +70,9 @@ def sections(scope: str) -> list[dict[str, Any]]:
                      if failed else None),
         })
 
-    if waiting:
-        out.append({
-            "heading": "Work Maintainer wants to start",
-            "bullets": [f"{t['repo']}: {t['title']}" for t in waiting[:6]],
-            "note": "Nothing runs until you approve it in Orion's inbox.",
-        })
+    # Herald's main "Waiting for you" section already counts these by agent. Repeating every
+    # brief here made the morning letter longer without adding a new decision.
     return [s for s in out if s]
-
-
-def _verdict(pr: dict[str, Any]) -> str:
-    """One word on whether the branch stands up, so the row is worth reading on a phone."""
-    if pr["verify"] == "failed":
-        return "build failed"
-    if pr["verify"] == "blocked":
-        return "verification unavailable"
-    if pr["verify"] == "passed":
-        return f"+{pr['insertions']}/-{pr['deletions']}"
-    return f"{pr['files_changed']} files"
 
 
 def alerts() -> list[dict[str, Any]]:

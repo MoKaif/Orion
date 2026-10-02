@@ -18,6 +18,7 @@ import {
   MessageCircleQuestion,
   Shuffle,
   Save,
+  ShieldCheck,
   LucideIcon,
 } from "lucide-react";
 import {
@@ -46,6 +47,7 @@ const ICONS: Record<string, LucideIcon> = {
   bot: Bot,
   "git-pull-request": GitPullRequest,
   "wallet-cards": WalletCards,
+  "shield-check": ShieldCheck,
 };
 
 const inr = (n: number) =>
@@ -347,6 +349,8 @@ export default function AgentDetail() {
   const finance = data.finance_snapshot;
   const financeInsights = data.finance_insights ?? [];
   const financeModel = data.finance_model;
+  const guardian = data.guardian;
+  const backups = data.backups ?? [];
   const threshold = data.hub_threshold ?? 3;
   const Icon = ICONS[agent.icon] ?? Bot;
   const metrics = summary.metrics ?? [];
@@ -424,6 +428,31 @@ export default function AgentDetail() {
         <p className="ap-blocked ap-note">
           <CircleAlert size={14} /> Treasurer is using its last safe state — {treasurer.reason}
         </p>
+      )}
+
+      {guardian && (
+        <section className="card guardian-panel">
+          <header className="card-head">
+            <ShieldCheck size={17} />
+            <h2>{guardian.ok ? "State is protected" : "Guardian needs attention"}</h2>
+            <span className={`count-pill${guardian.ok ? "" : " alert"}`}>
+              {guardian.backup_count} backups
+            </span>
+          </header>
+          <div className="guardian-grid">
+            <div><b>{guardian.databases_checked}</b><span>databases checked</span></div>
+            <div><b>{guardian.free_gb.toFixed(1)} GiB</b><span>disk available</span></div>
+            <div><b>{guardian.latest_backup?.name ?? "not yet"}</b><span>latest snapshot</span></div>
+          </div>
+          {guardian.problems.length > 0 && (
+            <ul className="guardian-problems">
+              {guardian.problems.map((problem) => <li key={problem}>{problem}</li>)}
+            </ul>
+          )}
+          {backups.length > 0 && (
+            <p className="registry-hint">Latest snapshot contains {backups[0].files} files and uses {(backups[0].bytes / 1024 / 1024).toFixed(1)} MiB.</p>
+          )}
+        </section>
       )}
 
       {finance && (

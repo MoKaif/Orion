@@ -91,7 +91,11 @@ def status() -> dict:
         missing = ("GMAIL_SENDER_APP_PASSWORD" if os.environ.get("GMAIL_SENDER_ADDRESS")
                    else "GMAIL_APP_PASSWORD")
         return {"ok": False, "reason": f"No {missing} in config/secrets.json."}
-    return {"ok": True, "reason": "", "from": sender_address(), "to": recipient(),
+    warning = ""
+    if os.environ.get("GMAIL_SENDER_APP_PASSWORD") and not os.environ.get("GMAIL_SENDER_ADDRESS"):
+        warning = ("Dedicated sender is incomplete; using GMAIL_ADDRESS with "
+                   "GMAIL_APP_PASSWORD until GMAIL_SENDER_ADDRESS is added.")
+    return {"ok": True, "reason": warning, "from": sender_address(), "to": recipient(),
             "dedicated_sender": dedicated_sender()}
 
 

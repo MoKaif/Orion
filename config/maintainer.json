@@ -28,8 +28,10 @@
   },
 
   "scan": {
-    "//": "The nightly audit. Facts are gathered here; DeepSeek only shapes them into briefs.",
-    "max_candidates_per_repo": 2,
+    "//": "The nightly audit. It may file at most three useful briefs across every repo.",
+    "max_candidates_per_repo": 1,
+    "max_daily_tasks": 3,
+    "max_open_tasks": 3,
     "commits": 25,
     "todo_hits": 20,
     "source_files": 5,
@@ -71,13 +73,17 @@
       "verify": "npm run build",
       "enabled": true
     },
-    "Timepieces": {
-      "path": "Timepieces",
+    "Perseus": {
+      "path": "Perseus",
       "base": "main",
-      "blurb": "Watch collection catalogue.",
-      "install": "pnpm install --frozen-lockfile",
-      "install_marker": "node_modules",
-      "verify": "pnpm build",
+      "blurb": "Personal health platform: Go API, React dashboard, Swift HealthKit client.",
+      "install": "npm --prefix server/web ci",
+      "install_marker": "server/web/node_modules",
+      "verify": "cd server && go test ./...",
+      "verify_by_path": {
+        "server/web/": "npm --prefix server/web run build",
+        "server/": "cd server && go test ./..."
+      },
       "enabled": true
     },
     "purple-buccaneers": {
@@ -98,7 +104,7 @@
       "install": "",
       "install_marker": "",
       "verify": "python -c \"import orion\"",
-      "enabled": false
+      "enabled": true
     }
   }
 }

@@ -1,0 +1,21 @@
+{
+  "//": "Guardian protects Orion's durable state without using an LLM.",
+  "name": "guardian",
+  "version": "0.1.0",
+  "specialists": [],
+  "agents": ["guardian"],
+  "tools": [],
+  "entity_types": [],
+  "relationship_types": [],
+  "background_jobs": [
+    { "name": "guardian_backup", "cron": "15 2 * * *" },
+    { "name": "guardian_audit", "cron": "15 */6 * * *" }
+  ],
+  "api_routes": [
+    "/plugins/guardian/status",
+    "/plugins/guardian/backups",
+    "/plugins/guardian/backup"
+  ],
+  "dashboard_widgets": ["guardian_status"],
+  "permissions": ["read_state", "backup_state"]
+}

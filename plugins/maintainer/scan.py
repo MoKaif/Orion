@@ -27,7 +27,7 @@ from . import repos, store
 
 log = logging.getLogger("orion.maintainer")
 
-_AUDIT_FOCUSES = ("correctness", "tests", "reliability", "maintainability", "documentation")
+_AUDIT_FOCUSES = ("correctness", "reliability", "product_value", "maintainability")
 
 _BRIEFER = (
     "You are Maintainer, the part of Orion that proposes code changes to its user's own "
@@ -36,15 +36,16 @@ _BRIEFER = (
     "also names tonight's audit focus and recently considered tasks.\n\n"
     "Propose at most {n} pieces of work worth doing next. Each one must be:\n"
     "  * small enough for a competent engineer to finish in one sitting,\n"
-    "  * verifiable — the repo's build or tests can tell whether it worked,\n"
+    "  * independently useful to the product or its reliability,\n"
     "  * grounded strictly in the facts given. Never invent a file, a symbol, a bug or a "
     "dependency that does not appear above. Do not repeat or paraphrase a recently considered "
     "task. Aim to find one concrete improvement under tonight's audit focus; return an empty "
     "list only when the supplied evidence genuinely supports no worthwhile change.\n\n"
-    "Prefer: finishing something the commits show as half-done, a TODO with real consequences, "
-    "missing documentation a newcomer would need, a test for logic that recently changed. "
-    "Avoid: broad refactors, dependency upgrades, redesigns, anything touching secrets, auth, "
-    "payments or database migrations, and anything you would need to ask a question about.\n\n"
+    "Prefer: finishing something the commits show as half-done, fixing a concrete defect, or "
+    "making an existing user workflow materially clearer or more reliable. Avoid test-only, "
+    "build-only, formatting-only, documentation-only, dependency-upgrade, and speculative "
+    "cleanup tasks. Also avoid broad refactors, redesigns, secrets, auth, payments, database "
+    "migrations, and anything you would need to ask a question about.\n\n"
     "Reply with JSON only: {{\"tasks\": [{{\"title\": \"imperative, under 70 characters\", "
     "\"rationale\": \"one sentence to the user on why this is worth their approval\", "
     "\"brief\": \"2-5 sentences of instruction to the engineer who will do it\", "
@@ -104,12 +105,18 @@ def _norm(title: str) -> str:
 async def scan_repos() -> dict[str, Any]:
     """Scheduled nightly. Audit repositories whether or not their base branch changed."""
     cfg = repos.scan_cfg()
-    per_repo = int(cfg.get("max_candidates_per_repo", 2) or 2)
+    per_repo = max(1, int(cfg.get("max_candidates_per_repo", 1) or 1))
+    daily_cap = max(0, int(cfg.get("max_daily_tasks", 3) or 3))
+    open_cap = max(0, int(cfg.get("max_open_tasks", 3) or 3))
     budget = job_limit("scan_repos", 6)          # repos per run, retunable from the agent page
 
     c = store.conn()
     try:
         expired = store.expire_stale_proposals(c, int(cfg.get("expire_briefs_days", 14) or 14))
+        expired += store.trim_proposals(c, open_cap)
+        made_today = store.tasks_created_since(c, 24, source="scan")
+        remaining = min(max(0, daily_cap - made_today),
+                        max(0, open_cap - len(store.proposed(c))))
         proposed, scanned, skipped = 0, [], []
 
         configured = repos.all_repos()
@@ -132,7 +139,9 @@ async def scan_repos() -> dict[str, Any]:
             digest = repos.digest(
                 repo, since_sha=last["head_sha"] if last else None,
                 focus=focus, previous_tasks=prior)
-            candidates = await _propose(digest, per_repo)
+            # Still record that the repository was observed, but do not spend a model call or
+            # create more inbox noise once the global daily/open budget is full.
+            candidates = await _propose(digest, min(per_repo, remaining)) if remaining else []
 
             seen = {_norm(t) for t in prior}
             filed = 0
@@ -149,6 +158,9 @@ async def scan_repos() -> dict[str, Any]:
                     risk=str(item.get("risk", "low")).lower()[:10] or "low",
                     source="scan")
                 filed += 1
+                remaining -= 1
+                if remaining <= 0:
+                    break
 
             store.mark_scanned(c, repo["name"], sha, filed)
             scanned.append(repo["name"])

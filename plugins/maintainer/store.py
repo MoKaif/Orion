@@ -229,6 +229,32 @@ def expire_stale_proposals(c: sqlite3.Connection, days: int) -> int:
     return cur.rowcount
 
 
+def trim_proposals(c: sqlite3.Connection, limit: int) -> int:
+    """Keep only the newest ``limit`` proposals; older briefs become quiet history."""
+    rows = c.execute(
+        "SELECT id FROM tasks WHERE status='proposed' ORDER BY id DESC"
+    ).fetchall()
+    stale = [r["id"] for r in rows[max(0, limit):]]
+    if not stale:
+        return 0
+    marks = ",".join("?" for _ in stale)
+    cur = c.execute(
+        f"UPDATE tasks SET status='expired', finished_at=? WHERE id IN ({marks})",
+        (now(), *stale),
+    )
+    c.commit()
+    return cur.rowcount
+
+
+def tasks_created_since(c: sqlite3.Connection, hours: float, source: str | None = None) -> int:
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
+    if source:
+        return int(c.execute(
+            "SELECT COUNT(*) FROM tasks WHERE created_at>=? AND source=?", (cutoff, source)
+        ).fetchone()[0])
+    return int(c.execute("SELECT COUNT(*) FROM tasks WHERE created_at>=?", (cutoff,)).fetchone()[0])
+
+
 # -- runs ------------------------------------------------------------------
 def start_run(c: sqlite3.Connection, task_id: int, branch: str = "") -> int:
     cur = c.execute("INSERT INTO runs (task_id, branch, started_at, heartbeat_at) "

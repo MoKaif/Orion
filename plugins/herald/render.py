@@ -22,18 +22,29 @@ from typing import Any
 # The tokens from interfaces/spa/src/styles/tokens.css, hard-coded because mail cannot
 # reference them. Dark-only on purpose: a mail client's own theme cannot be queried, and the
 # obsidian base is what makes a briefing recognizably Orion at a glance in a crowded inbox.
-INK = "#e8e6dc"
-MUTED = "#9d9b8d"
-BG = "#0e100e"
-CARD = "#121512"
-LINE = "#242a24"
-COPPER = "#d0925f"
-FACT = "#85bb9c"
-IDEA = "#d6b360"
+INK = "#e5e7eb"
+MUTED = "#94a3b8"
+BG = "#0b0f14"
+CARD = "#111827"
+LINE = "#263244"
+COPPER = "#60a5fa"
+FACT = "#34d399"
+IDEA = "#f59e0b"
 
-_SERIF = "Iowan Old Style, Palatino, 'Palatino Linotype', Georgia, serif"
 _SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 _MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+
+
+def _unique(values: list[Any]) -> list[Any]:
+    """Stable de-duplication for facts contributed by overlapping report sources."""
+    out: list[Any] = []
+    seen: set[str] = set()
+    for value in values:
+        key = repr(value)
+        if key not in seen:
+            seen.add(key)
+            out.append(value)
+    return out
 
 
 def _row(label: str, value: Any, accent: str = INK) -> str:
@@ -52,17 +63,17 @@ def _section_html(section: dict[str, Any]) -> str:
         f'text-transform:uppercase;color:{COPPER};">{heading}</h2>'
     ]
     if section.get("blurb"):
-        parts.append(f'<p style="margin:0 0 12px;font:15px/1.6 {_SERIF};color:{MUTED};">'
+        parts.append(f'<p style="margin:0 0 12px;font:14px/1.6 {_SANS};color:{MUTED};">'
                      f'{escape(section["blurb"])}</p>')
     if section.get("rows"):
         cells = "".join(_row(label, value, section.get("accent", INK))
-                        for label, value in section["rows"])
+                        for label, value in _unique(section["rows"]))
         parts.append(f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
                      f'style="border-collapse:collapse;">{cells}</table>')
     if section.get("bullets"):
         items = "".join(
-            f'<li style="margin:0 0 7px;font:15px/1.55 {_SERIF};color:{INK};">{escape(b)}</li>'
-            for b in section["bullets"])
+            f'<li style="margin:0 0 7px;font:14px/1.55 {_SANS};color:{INK};">{escape(b)}</li>'
+            for b in _unique(section["bullets"]))
         parts.append(f'<ul style="margin:10px 0 0;padding-left:18px;">{items}</ul>')
     if section.get("note"):
         parts.append(f'<p style="margin:12px 0 0;font:13px/1.55 {_SANS};color:{MUTED};">'
@@ -78,7 +89,7 @@ def html(letter: dict[str, Any]) -> str:
         # The model's prose. Blank lines become paragraphs; nothing else is interpreted, so a
         # stray angle bracket from a note title cannot inject markup into the mail.
         paras = "".join(
-            f'<p style="margin:0 0 12px;font:16px/1.65 {_SERIF};color:{INK};">{escape(p.strip())}</p>'
+            f'<p style="margin:0 0 12px;font:15px/1.65 {_SANS};color:{INK};">{escape(p.strip())}</p>'
             for p in str(letter["lede"]).split("\n\n") if p.strip())
         lede = (f'<div style="margin:0 0 6px;padding:0 0 4px;border-left:2px solid {COPPER};'
                 f'padding-left:16px;">{paras}</div>')
@@ -91,11 +102,11 @@ def html(letter: dict[str, Any]) -> str:
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0"
              style="border-collapse:collapse;width:600px;max-width:100%;background:{CARD};
-                    border:1px solid {LINE};border-top:3px solid {COPPER};">
-        <tr><td style="padding:30px 34px 34px;">
+                    border:1px solid {LINE};border-radius:16px;">
+        <tr><td style="padding:28px 32px 30px;">
           <p style="margin:0 0 4px;font:600 11px {_SANS};letter-spacing:.2em;
                     text-transform:uppercase;color:{COPPER};">{escape(letter.get("eyebrow", "Orion"))}</p>
-          <h1 style="margin:0 0 4px;font:400 27px/1.2 {_SERIF};color:{INK};">
+          <h1 style="margin:0 0 4px;font:600 26px/1.2 {_SANS};letter-spacing:-.02em;color:{INK};">
             {escape(letter.get("title", ""))}</h1>
           <p style="margin:0 0 22px;font:13px {_SANS};color:{MUTED};">
             {escape(letter.get("dateline", ""))}</p>

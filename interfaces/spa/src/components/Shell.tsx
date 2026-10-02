@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useCallback, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -6,10 +6,12 @@ import {
   Bot,
   MessagesSquare,
   History,
+  Settings,
 } from "lucide-react";
 import { useInbox } from "../api";
 import Telemetry from "./Telemetry";
-import ThemeToggle from "./ThemeToggle";
+import OrbitMark from "./OrbitMark";
+import SettingsModal from "./SettingsModal";
 import "./shell.css";
 
 const NAV = [
@@ -26,6 +28,8 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [teleCollapsed, setTeleCollapsed] = useState(
     () => localStorage.getItem("orion-tele-collapsed") === "1",
   );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const toggleTele = () =>
     setTeleCollapsed((v) => {
       localStorage.setItem("orion-tele-collapsed", v ? "0" : "1");
@@ -36,12 +40,10 @@ export default function Shell({ children }: { children: ReactNode }) {
     <div className={`shell${teleCollapsed ? " tele-collapsed" : ""}`}>
       <nav className="rail">
         <div className="brand">
-          <span className="brand-mark">
-            <img src="/assets/orion-mark.svg" alt="" />
-          </span>
+          <span className="brand-mark"><OrbitMark size={34} /></span>
           <div>
             <div className="brand-name">Orion</div>
-            <div className="brand-sub">KNOWLEDGE OS</div>
+            <div className="brand-sub">Knowledge OS</div>
           </div>
         </div>
 
@@ -64,13 +66,17 @@ export default function Shell({ children }: { children: ReactNode }) {
         </ul>
 
         <div className="nav-foot">
-          <ThemeToggle />
+          <button className="nav-item settings-trigger" onClick={() => setSettingsOpen(true)}>
+            <Settings size={17} strokeWidth={1.9} /><span>Settings</span>
+          </button>
         </div>
       </nav>
 
       <main className="main">{children}</main>
 
       <Telemetry collapsed={teleCollapsed} onToggle={toggleTele} />
+      <SettingsModal open={settingsOpen} onClose={closeSettings}
+        telemetryCollapsed={teleCollapsed} onTelemetryToggle={toggleTele} />
     </div>
   );
 }

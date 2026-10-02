@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -636,6 +636,15 @@ async def legacy_index(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return _spa_index() or await legacy_index(request)
+
+
+@app.get("/orion.svg", include_in_schema=False)
+async def orion_icon():
+    """The Vite public icon lives at the dist root, outside the hashed /assets mount."""
+    icon = _SPA_DIST / "orion.svg"
+    if icon.is_file():
+        return FileResponse(icon, media_type="image/svg+xml")
+    return JSONResponse({"error": "icon not built"}, status_code=404)
 
 
 async def spa_fallback(full_path: str, request: Request):

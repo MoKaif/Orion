@@ -7,6 +7,8 @@ Entity/relationship *types* are free-text so plugins extend the model without mi
 from __future__ import annotations
 
 import json
+import math
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,16 @@ from .vectors import BUSY_TIMEOUT_MS, vectors
 
 
 class WorldModel:
+    # Conversational scaffolding must not decide retrieval relevance.  The old ANY-term
+    # matcher treated words such as "what" and "about" as evidence and consequently returned
+    # essentially random long notes for ordinary questions.
+    _RECALL_STOPWORDS = frozenset({
+        "about", "also", "been", "could", "does", "from", "have", "just", "know",
+        "like", "more", "much", "should", "that", "their", "there", "these", "they",
+        "this", "those", "what", "when", "where", "which", "with", "would", "your",
+        "mine", "ours", "please", "tell", "give", "show", "working", "work", "you",
+        "did", "does", "are", "can", "was", "were",
+    })
     def __init__(self, db_path: Path | None = None):
         cfg = config.section("memory")
         self._path = db_path or (config.root() / cfg.get("db_path", "data/orion.db"))
@@ -91,6 +103,60 @@ class WorldModel:
         if status == "accepted":
             vectors.add(f"k:{kid}", value)
         return kid
+
+    def sync_knowledge(self, entity_id: int, key_prefix: str,
+                       items: list[tuple[str, str]], *, kind: str = "fact",
+                       confidence: float = 1.0, source: str | None = None) -> list[int]:
+        """Replace one generated slice of an entity's accepted knowledge.
+
+        Indexers own their key prefix (for example ``content`` / ``content:0001``), while
+        hand-curated knowledge on the same entity remains untouched. Removed and changed rows
+        are removed from the vector index before their replacements are embedded.
+        """
+        wanted = {key: value for key, value in items if value.strip()}
+        changed: list[tuple[int, str]] = []
+        removed: list[int] = []
+        synced: list[int] = []
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id,key,value FROM knowledge WHERE entity_id=? "
+                "AND (key=? OR key LIKE ?)",
+                (entity_id, key_prefix, f"{key_prefix}:%"),
+            ).fetchall()
+            existing = {r["key"]: r for r in rows}
+            for key, row in existing.items():
+                if key not in wanted:
+                    conn.execute("DELETE FROM knowledge WHERE id=?", (row["id"],))
+                    removed.append(row["id"])
+            for key, value in wanted.items():
+                row = existing.get(key)
+                if row and row["value"] == value:
+                    conn.execute(
+                        "UPDATE knowledge SET kind=?,confidence=?,status='accepted',source=? "
+                        "WHERE id=?", (kind, confidence, source, row["id"]),
+                    )
+                    synced.append(row["id"])
+                    continue
+                if row:
+                    conn.execute(
+                        "UPDATE knowledge SET value=?,kind=?,confidence=?,status='accepted',source=? "
+                        "WHERE id=?", (value, kind, confidence, source, row["id"]),
+                    )
+                    changed.append((row["id"], value))
+                    synced.append(row["id"])
+                else:
+                    cur = conn.execute(
+                        "INSERT INTO knowledge (entity_id,key,value,kind,confidence,status,source) "
+                        "VALUES (?,?,?,?,?,'accepted',?)",
+                        (entity_id, key, value, kind, confidence, source),
+                    )
+                    changed.append((cur.lastrowid, value))
+                    synced.append(cur.lastrowid)
+        stale = [f"k:{kid}" for kid in removed] + [f"k:{kid}" for kid, _ in changed]
+        vectors.remove(stale)
+        for kid, value in changed:
+            vectors.add(f"k:{kid}", value)
+        return synced
 
     def add_relationship(self, src_id: int, dst_id: int, type: str, confidence: float = 1.0,
                          status: str = "accepted", source: str | None = None) -> int:
@@ -330,39 +396,109 @@ class WorldModel:
 
         # keyword: tokenize the query and match ANY significant term (the semantic index,
         # when available, handles fuzzier matches; this is the zero-dependency fallback).
-        import re
-        terms = [t for t in re.findall(r"\w+", query.lower()) if len(t) >= 3][:8]
+        raw_terms = re.findall(r"[\w'-]+", query.lower())
+        terms = list(dict.fromkeys(
+            (t[:-1] if t.endswith("s") and len(t) > 4 else t)
+            for t in raw_terms if len(t) >= 3 and t not in self._RECALL_STOPWORDS
+        ))[:10]
         if terms:
-            clause = " OR ".join(["(lower(k.value) LIKE ? OR lower(e.name) LIKE ?)"] * len(terms))
+            clause = " OR ".join(
+                ["(lower(k.value) LIKE ? OR lower(e.name) LIKE ? OR lower(k.key) LIKE ?)"]
+                * len(terms)
+            )
             params: list[Any] = []
             for t in terms:
-                params += [f"%{t}%", f"%{t}%"]
+                params += [f"%{t}%", f"%{t}%", f"%{t}%"]
             with self._connect() as conn:
                 rows = conn.execute(
-                    f"""SELECT k.id, e.name, e.type, k.key, k.value, k.kind, k.confidence
+                    f"""SELECT k.id, e.id entity_id, e.name, e.type, k.key, k.value,
+                               k.kind, k.confidence, coalesce(k.source,e.source) source
                         FROM knowledge k JOIN entities e ON e.id=k.entity_id
                         WHERE k.status='accepted' AND ({clause})
-                        LIMIT ?""",
-                    (*params, limit * 3),
+                        LIMIT ?""", (*params, max(limit * 12, 60)),
                 ).fetchall()
+            frequency = {
+                term: sum(
+                    term in f"{r['name']} {r['key']} {r['value']}".lower() for r in rows
+                ) for term in terms
+            }
+            weights = {
+                term: math.log((len(rows) + 1) / (frequency[term] + 1)) + 1.0
+                for term in terms
+            }
+            total_weight = sum(weights.values()) or 1.0
             for r in rows:
                 d = dict(r)
-                hay = f"{d['value']} {d['name']}".lower()
-                d["score"] = sum(t in hay for t in terms) / len(terms)  # fraction of terms matched
-                results.setdefault(d["id"], d)
+                name, key, value = d["name"].lower(), d["key"].lower(), d["value"].lower()
+                matched = [t for t in terms if t in name or t in key or t in value]
+                coverage = sum(weights[t] for t in matched) / total_weight
+                # Names and metadata are stronger signals than a stray occurrence deep in a note.
+                name_hits = sum(t in name for t in terms)
+                key_hits = sum(t in key for t in terms)
+                phrase = " ".join(terms)
+                phrase_bonus = 1.0 if len(terms) > 1 and phrase in f"{name} {value}" else 0.0
+                d["score"] = coverage + (0.35 * name_hits) + (0.1 * key_hits) + phrase_bonus
+                previous = results.get(d["id"])
+                if previous is None or d["score"] > previous.get("score", 0.0):
+                    results[d["id"]] = d
 
         merged = sorted(results.values(), key=lambda d: (d.get("score", 0.0), d["confidence"]),
                         reverse=True)
-        return merged[:limit]
+        # A chunked note may have several genuinely relevant passages, but allowing it to take
+        # every slot recreates the partial-knowledge problem at the entity level.
+        diversified: list[dict[str, Any]] = []
+        per_entity: dict[int, int] = {}
+        for item in merged:
+            eid = int(item.get("entity_id", item["id"]))
+            if per_entity.get(eid, 0) >= 2:
+                continue
+            diversified.append(item)
+            per_entity[eid] = per_entity.get(eid, 0) + 1
+            if len(diversified) >= limit:
+                break
+        return diversified
 
     def _knowledge_row(self, kid: int) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(
-                """SELECT k.id, e.name, e.type, k.key, k.value, k.kind, k.confidence
+                """SELECT k.id, e.id entity_id, e.name, e.type, k.key, k.value, k.kind,
+                          k.confidence, coalesce(k.source,e.source) source
                    FROM knowledge k JOIN entities e ON e.id=k.entity_id WHERE k.id=?""",
                 (kid,),
             ).fetchone()
         return dict(row) if row else None
+
+    def overview(self, limit: int = 10) -> list[dict[str, Any]]:
+        """A bounded cross-section for explicit "what do you know about me?" requests.
+
+        Prefer structured world-model knowledge over raw imported notes, then diversify by
+        entity. This is deliberately read-only and accepted-only, like normal recall.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT k.id, e.id entity_id, e.name, e.type, k.key, k.value, k.kind,
+                          k.confidence, coalesce(k.source,e.source) source
+                   FROM knowledge k JOIN entities e ON e.id=k.entity_id
+                   WHERE k.status='accepted'
+                   ORDER BY CASE WHEN lower(e.name) IN ('user','kaif') THEN 0 ELSE 1 END,
+                            CASE WHEN e.type='note' THEN 1 ELSE 0 END,
+                            e.updated_at DESC, k.id DESC
+                   LIMIT ?""", (max(limit * 5, 50),),
+            ).fetchall()
+        out: list[dict[str, Any]] = []
+        per_entity: dict[int, int] = {}
+        for row in rows:
+            item = dict(row)
+            personal = item["name"].lower() in {"user", "kaif"}
+            cap = 4 if personal else 1
+            if per_entity.get(item["entity_id"], 0) >= cap:
+                continue
+            per_entity[item["entity_id"]] = per_entity.get(item["entity_id"], 0) + 1
+            item["score"] = 1.0
+            out.append(item)
+            if len(out) >= limit:
+                break
+        return out
 
     # -- conversations -----------------------------------------------------
     def create_session(self, title: str | None = None) -> int:

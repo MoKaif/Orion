@@ -138,6 +138,7 @@ def source_sample(repo: dict[str, Any], focus: str, limit: int = 5) -> dict[str,
         "correctness": ("parser", "service", "store", "engine", "core", "api"),
         "tests": ("test", "spec", "parser", "service", "core"),
         "reliability": ("error", "client", "api", "service", "store", "worker", "runner"),
+        "product_value": ("ui", "view", "page", "feature", "handler", "service", "api"),
         "maintainability": ("core", "service", "util", "helper", "manager", "engine"),
         "documentation": ("readme", "docs/", "agents.md", "config", "manifest"),
     }.get(focus, ())

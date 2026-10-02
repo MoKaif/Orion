@@ -1,0 +1,33 @@
+.orbit-mark {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 34%, transparent));
+}
+.orbit-core {
+  position: absolute;
+  inset: 28%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 24%, #a7c7ff 0, #3558a9 32%, #101a36 68%, #070b16 100%);
+  box-shadow: inset -5px -7px 12px rgba(0, 0, 0, 0.6), 0 0 11px rgba(96, 165, 250, 0.28);
+}
+.orbit-ring {
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  border: max(1px, 0.075em) solid transparent;
+  background: linear-gradient(135deg, #dbeafe, var(--primary) 45%, var(--accent) 80%, transparent 81%) border-box;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transform: rotate(-17deg);
+}
+.orbit-moon {
+  position: absolute;
+  width: 16%;
+  aspect-ratio: 1;
+  right: 3%;
+  top: 18%;
+  border-radius: 50%;
+  background: #a7c7ff;
+  box-shadow: 0 0 8px #60a5fa;
+}

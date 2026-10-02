@@ -247,14 +247,6 @@ async def morning_briefing() -> dict:
         sections.append({"heading": "Waiting for you",
                          "blurb": "Nothing. The review queue is empty."})
 
-    if runs:
-        # One row per *job*, not per run. The vault index fires hourly, so listing runs
-        # individually buried the interesting passes under ten identical lines.
-        sections.append({
-            "heading": "Overnight",
-            "rows": _run_tally(runs),
-            "accent": render.FACT if not failures else render.IDEA,
-        })
     if failures:
         sections.append({
             "heading": "Went wrong",
@@ -263,17 +255,11 @@ async def morning_briefing() -> dict:
         })
     # whatever the other agents have to say for themselves (Maintainer's pull requests, ...)
     sections.extend(_plugin_sections("briefing"))
-    if stats:
-        sections.append({
-            "heading": "World model",
-            "rows": [("entities", stats.get("entities", 0)),
-                     ("knowledge", stats.get("knowledge", 0)),
-                     ("relationships", stats.get("relationships", 0)),
-                     ("events", stats.get("events", 0))],
-        })
     sections.append({
-        "heading": "Cloud spend",
-        "rows": [("today", _money(spend["cost_usd"])), ("tokens", f"{spend['tokens']:,}")],
+        "heading": "At a glance",
+        "rows": [("jobs completed", len(runs) - len(failures)),
+                 ("knowledge items", stats.get("knowledge", 0)),
+                 ("cloud spend", _money(spend["cost_usd"]))],
     })
 
     letter = {

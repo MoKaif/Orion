@@ -32,7 +32,17 @@ def _parse(raw: str) -> list[dict[str, Any]]:
         return []
     try:
         data = json.loads(raw[start:end + 1])
-        return [d for d in data if isinstance(d, dict) and d.get("entity") and d.get("value")]
+        candidates = [
+            d for d in data if isinstance(d, dict) and d.get("entity") and d.get("value")
+        ]
+        # These are model inferences even when the model calls itself 100% confident. Keep them
+        # below the auto-accept boundary so every chat-derived item passes through review.
+        for candidate in candidates:
+            try:
+                candidate["confidence"] = min(float(candidate.get("confidence", 0.5)), 0.99)
+            except (TypeError, ValueError):
+                candidate["confidence"] = 0.5
+        return candidates
     except json.JSONDecodeError:
         return []
 

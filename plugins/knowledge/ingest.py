@@ -15,7 +15,33 @@ from typing import Any
 from orion.core.config import config
 from orion.core.world_model import world_model
 
-_MAX_CHARS = 8000  # cap per note so a giant file can't bloat a single knowledge row
+_CHUNK_CHARS = 1800
+_MAX_NOTE_CHARS = 80_000  # bound pathological files without discarding normal long-form notes
+
+
+def _chunks(text: str, limit: int = _CHUNK_CHARS) -> list[str]:
+    """Split Markdown on paragraph boundaries, carrying the current heading into each chunk."""
+    blocks = [b.strip() for b in text[:_MAX_NOTE_CHARS].split("\n\n") if b.strip()]
+    out: list[str] = []
+    current: list[str] = []
+    size = 0
+    heading = ""
+    for block in blocks:
+        if block.lstrip().startswith("#"):
+            heading = block.splitlines()[0].strip()
+        pieces = [block[i:i + limit] for i in range(0, len(block), limit)] or [block]
+        for piece in pieces:
+            prefix = heading if heading and heading not in piece else ""
+            added = len(piece) + (len(prefix) + 2 if prefix and not current else 0)
+            if (current and size + added > limit
+                    and not (len(current) == 1 and current[0] == heading)):
+                out.append("\n\n".join(current))
+                current, size = ([heading] if heading and heading not in piece else []), len(heading)
+            current.append(piece)
+            size += len(piece) + 2
+    if current:
+        out.append("\n\n".join(current))
+    return out
 
 
 def _ignored(rel: Path, vault_cfg: dict[str, Any]) -> bool:
@@ -63,8 +89,10 @@ def ingest_vault() -> dict[str, Any]:
         rel = str(path.relative_to(vault))
         eid = world_model.upsert_entity("note", path.stem, canonical_key=f"note:{rel}",
                                         source=rel)
-        world_model.add_knowledge(eid, key="content", value=text[:_MAX_CHARS],
-                                  kind="fact", confidence=1.0, status="accepted", source=rel)
+        chunks = _chunks(text)
+        items = [(f"content:{i:04d}", chunk) for i, chunk in enumerate(chunks)]
+        world_model.sync_knowledge(eid, "content", items, kind="fact",
+                                   confidence=1.0, source=rel)
         ingested += 1
 
     world_model.add_event("vault_ingested", {"ingested": ingested, "skipped": skipped})

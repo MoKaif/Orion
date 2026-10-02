@@ -1,0 +1,7 @@
+{
+  "//": "Guardian stores consistent local snapshots under data/backups/guardian.",
+  "enabled": true,
+  "retention": 7,
+  "stale_after_hours": 36,
+  "minimum_free_gb": 2.0
+}

@@ -808,6 +808,14 @@
 .memory-interview-head h2, .memory-cue blockquote { font-family: var(--sans); }
 .memory-cue blockquote { font-weight: 560; }
 
+.guardian-panel { margin-top: 18px; }
+.guardian-panel .card-head svg { color: var(--observation); }
+.guardian-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.guardian-grid > div { display: flex; flex-direction: column; gap: 3px; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--inset); }
+.guardian-grid b { color: var(--fg); font: 600 14px/1.25 var(--mono); overflow-wrap: anywhere; }
+.guardian-grid span { color: var(--muted); font-size: 11px; }
+.guardian-problems { margin: 14px 0 0; padding-left: 20px; color: var(--danger); font-size: 12.5px; }
+
 @media (max-width: 900px) {
   .ap-strip { grid-template-columns: repeat(3, 1fr); }
   .ap-shift { grid-column: 1 / -1; width: 100%; margin: 0; }
@@ -819,4 +827,5 @@
   .ap-id h1 { font-size: 27px; }
   .ap-mark { width: 44px; height: 44px; }
   .pass { padding: 14px; }
+  .guardian-grid { grid-template-columns: 1fr; }
 }

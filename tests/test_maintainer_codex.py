@@ -133,6 +133,37 @@ class MaintainerStoreMigrationTests(unittest.TestCase):
         finally:
             store._DB, store._READY = old_db, old_ready
 
+    def test_proposal_backpressure_keeps_only_three(self):
+        old_db, old_ready = store._DB, store._READY
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                store._DB = Path(tmp) / "maintainer.db"
+                store._READY = False
+                c = store.conn()
+                for i in range(6):
+                    store.add_task(c, "Example", f"Task {i}", "Brief")
+                retired = store.trim_proposals(c, 3)
+                self.assertEqual(retired, 3)
+                self.assertEqual(len(store.proposed(c)), 3)
+                self.assertEqual(store.tasks_created_since(c, 24, source="scan"), 6)
+                c.close()
+        finally:
+            store._DB, store._READY = old_db, old_ready
+
+    def test_pr_refresh_queries_only_supported_states(self):
+        replies = [
+            (0, '[{"url":"https://example.test/1","state":"open"}]'),
+            (0, '[{"url":"https://example.test/2","state":"closed"}]'),
+        ]
+        with (patch.object(runner.shutil, "which", return_value="/usr/bin/gh"),
+              patch.object(runner, "run", side_effect=replies) as run,
+              patch.object(runner, "api") as api):
+            runner.refresh_prs()
+        states = [call.args[0][call.args[0].index("--state") + 1] for call in run.call_args_list]
+        self.assertEqual(states, ["open", "closed"])
+        api.assert_called_once_with("/runner/prs", {"states": {
+            "https://example.test/1": "open", "https://example.test/2": "closed"}})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -55,8 +55,19 @@ class Context:
         """Per-turn context (recalled knowledge + tool result) — kept after the cached prefix."""
         parts = []
         if self.known:
-            lines = "\n".join(f"- ({k['kind']} {k['confidence']:.0%}) {k['value']}" for k in self.known)
-            parts.append("What you already know that is relevant:\n" + lines)
+            lines = []
+            for k in self.known:
+                source = k.get("source") or "world model"
+                lines.append(
+                    f"- [{k['type']}: {k['name']} | source: {source} | "
+                    f"{k['kind']} {k['confidence']:.0%}]\n  {k['value']}"
+                )
+            parts.append(
+                "Recalled knowledge, ranked for this request. Use only passages that actually "
+                "support the answer; cite the note/entity name and say when coverage is partial. "
+                "Do not treat absence from this bounded recall set as proof that the knowledge "
+                "does not exist:\n" + "\n".join(lines)
+            )
         else:
             parts.append(
                 "Your memory surfaced nothing specific for this query. If it concerns Kaif's "
@@ -71,11 +82,22 @@ class Context:
         return "\n\n".join(p for p in (self.stable_system(), self.volatile_system()) if p)
 
 
-def assemble(message: str) -> Context:
+def assemble(message: str, prior_messages: list[dict[str, Any]] | None = None) -> Context:
     """Steps 1-4: intent, consult world model, identify gaps, choose mode + specialist."""
     # Config-tunable recall size: on the local CPU model, prompt length is latency.
     limit = config.section("memory").get("recall", {}).get("limit", 10)
-    known = world_model.recall(message, limit=limit)
+    # Follow-ups such as "what about that project?" are meaningless in isolation. Include the
+    # last two user turns for retrieval only; normal chat history is still supplied separately.
+    prior_user = [m["content"] for m in (prior_messages or []) if m.get("role") == "user"][-2:]
+    retrieval_query = "\n".join([*prior_user, message])
+    known = world_model.recall(retrieval_query, limit=limit)
+    normalized = " ".join(message.lower().split())
+    overview_request = any(phrase in normalized for phrase in (
+        "what do you know about me", "what you know about me", "who am i",
+        "summarize what you know", "summary of what you know",
+    ))
+    if overview_request:
+        known = world_model.overview(limit=limit)
     return Context(
         message=message,
         mode=cognition.classify(message),
@@ -123,7 +145,9 @@ async def handle_turn(message: str, session_id: int,
     background job so chat never waits behind maintenance on the single local pipe.
     """
     async with gate.foreground():
-        ctx = assemble(message)
+        recent = config.section("memory").get("conversation", {}).get("recent_turns", 6)
+        prior = world_model.history(session_id, limit=recent * 2)
+        ctx = assemble(message, prior)
         if on_event:
             on_event({"type": "context", "mode": ctx.mode.value,
                       "specialist": ctx.specialist.name, "known": len(ctx.known)})
@@ -131,7 +155,6 @@ async def handle_turn(message: str, session_id: int,
         world_model.add_message(session_id, "user", message)
         await _maybe_run_tool(ctx, on_event, session_id)
 
-        recent = config.section("memory").get("conversation", {}).get("recent_turns", 6)
         hist = world_model.history(session_id, limit=recent * 2)
         # Stable prefix is cacheable; volatile per-turn context is a separate block that
         # never invalidates the cached prefix. Both go out-of-band as `system` to the cloud
