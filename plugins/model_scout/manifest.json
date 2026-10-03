@@ -1,0 +1,17 @@
+{
+  "//": "Evidence-based model research and review-gated upgrades.",
+  "name": "model_scout",
+  "version": "0.1.0",
+  "specialists": [],
+  "agents": ["model_scout"],
+  "tools": [],
+  "entity_types": [],
+  "relationship_types": [],
+  "background_jobs": [
+    {"name": "model_scout_research", "cron": "30 4 * * 0"},
+    {"name": "model_scout_benchmark", "cron": "0 5 1 * *"}
+  ],
+  "api_routes": ["/plugins/model_scout/status", "/plugins/model_scout/runs", "/plugins/model_scout/recommendations"],
+  "dashboard_widgets": ["model_scout_status"],
+  "permissions": ["read_model_catalog", "benchmark_local_models", "propose_model_change", "write_local_model_config_after_approval"]
+}

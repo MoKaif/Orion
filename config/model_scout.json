@@ -1,0 +1,52 @@
+{
+  "//": "Review-gated model research. Never downloads or switches a model unattended.",
+  "enabled": true,
+  "benchmark_limit": 18,
+  "laya": {
+    "base_url": "http://127.0.0.1:8765",
+    "timeout_seconds": 120
+  },
+  "gates": {
+    "minimum_accuracy": 0.75,
+    "minimum_improvement": 0.05,
+    "maximum_mean_seconds": 8.0
+  },
+  "candidates": [
+    {
+      "name": "Qwen 3.5 4B Q4",
+      "kind": "ollama",
+      "model": "qwen3.5:4b",
+      "repo": "Qwen/Qwen3.5-4B",
+      "size_gb": 3.4,
+      "source": "https://huggingface.co/Qwen/Qwen3.5-4B",
+      "rationale": "Current-generation 4B model with strong instruction following and agent/tool support."
+    },
+    {
+      "name": "Qwen 3 4B Q4",
+      "kind": "ollama",
+      "model": "qwen3:4b",
+      "repo": "Qwen/Qwen3-4B",
+      "size_gb": 2.5,
+      "source": "https://huggingface.co/Qwen/Qwen3-4B",
+      "rationale": "Mature Apache-2.0 4B upgrade candidate available directly through Ollama."
+    },
+    {
+      "name": "Phi-4 Mini",
+      "kind": "ollama",
+      "model": "phi4-mini:3.8b",
+      "repo": "microsoft/Phi-4-mini-instruct",
+      "size_gb": 2.5,
+      "source": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+      "rationale": "Compact model with function calling and strong published reasoning results."
+    },
+    {
+      "name": "Laya English",
+      "kind": "laya",
+      "model": "convaiinnovations/laya",
+      "repo": "convaiinnovations/laya",
+      "size_gb": 0.8,
+      "source": "https://huggingface.co/convaiinnovations/laya",
+      "rationale": "Non-generative decision model to test against Orion's mode and specialist heuristics."
+    }
+  ]
+}

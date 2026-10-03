@@ -322,6 +322,32 @@ export interface FinanceModel {
   created_at: string;
 }
 
+export interface ModelScoutResult {
+  name: string;
+  kind: "heuristic" | "ollama" | "laya";
+  available: boolean;
+  accuracy: number | null;
+  mean_seconds?: number;
+  reason?: string;
+}
+
+export interface ModelScoutRun {
+  id: number;
+  current_model: string;
+  results: ModelScoutResult[];
+  summary: string;
+  created_at: string;
+}
+
+export interface ModelScoutStatus {
+  ok: boolean;
+  state: string;
+  current_model: string;
+  last_benchmark: string | null;
+  last_research: string | null;
+  reason: string;
+}
+
 /** An agent's own page. The optional panels are contributed by the agent itself. */
 export interface AgentDetail {
   agent: AgentIdentity;
@@ -347,6 +373,9 @@ export interface AgentDetail {
   finance_model?: FinanceModel | null;
   guardian?: GuardianStatus;
   backups?: GuardianBackup[];
+  model_scout?: ModelScoutStatus;
+  model_runs?: ModelScoutRun[];
+  model_research?: { updated_at: string; value: { candidates?: unknown[] } } | null;
 }
 
 export interface JobPatch {

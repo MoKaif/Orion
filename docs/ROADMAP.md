@@ -129,6 +129,9 @@ reference implementation.
    duplicating the mailbox in Orion.
 4. **Mobile access** — expose the responsive interface through Tailscale after the chat and
    calendar surfaces are ready for daily use.
+5. **Continuous model fitness** — Model Scout tracks official lightweight candidates, benchmarks
+   available local models and Laya against Orion-shaped tasks, and proposes review-gated upgrades.
+   It never downloads or switches a model unattended.
 
 - [x] **Vitalist / health** (`plugins/health/`) — reads Perseus over HTTP, computes daily and
       weekly personal-baseline comparisons, constrains LLM prose to those facts, and contributes

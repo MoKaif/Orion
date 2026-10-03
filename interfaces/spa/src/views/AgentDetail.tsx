@@ -351,6 +351,8 @@ export default function AgentDetail() {
   const financeModel = data.finance_model;
   const guardian = data.guardian;
   const backups = data.backups ?? [];
+  const modelScout = data.model_scout;
+  const modelRuns = data.model_runs ?? [];
   const threshold = data.hub_threshold ?? 3;
   const Icon = ICONS[agent.icon] ?? Bot;
   const metrics = summary.metrics ?? [];
@@ -452,6 +454,38 @@ export default function AgentDetail() {
           {backups.length > 0 && (
             <p className="registry-hint">Latest snapshot contains {backups[0].files} files and uses {(backups[0].bytes / 1024 / 1024).toFixed(1)} MiB.</p>
           )}
+        </section>
+      )}
+
+      {modelScout && (
+        <section className="card finance-panel">
+          <header className="card-head">
+            <Bot size={17} />
+            <h2>Local model evidence</h2>
+            <span className="count-pill">{modelScout.current_model}</span>
+          </header>
+          {modelRuns.length === 0 ? (
+            <p className="registry-hint">No benchmark yet. Run “Benchmark installed models” below.</p>
+          ) : (
+            <>
+              <p className="registry-hint">
+                {modelRuns[0].summary} Measured {agoText(modelRuns[0].created_at)}; unavailable
+                candidates are recorded, never treated as failures.
+              </p>
+              {modelRuns[0].results.map((result) => (
+                <div className="finance-row" key={`${result.kind}-${result.name}`}>
+                  <span>{result.name}</span><i className="leader" />
+                  <b>{result.available && result.accuracy !== null
+                    ? `${Math.round(result.accuracy * 100)}%${result.mean_seconds ? ` · ${result.mean_seconds.toFixed(2)}s` : ""}`
+                    : "unavailable"}</b>
+                </div>
+              ))}
+            </>
+          )}
+          <p className="registry-hint">
+            Research refreshed {modelScout.last_research ? agoText(modelScout.last_research) : "not yet"}.
+            Model downloads and routing changes require review in the inbox.
+          </p>
         </section>
       )}
 

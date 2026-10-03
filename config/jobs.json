@@ -33,6 +33,9 @@
     "chronos_mail_scan":     { "enabled": true, "cron": "20 0 * * *", "//": "Chronos · nightly low-CPU commitment scan" },
     "chronos_journal_scan":  { "enabled": true, "cron": "40 0 * * *", "//": "Chronos · approved Journal entries to commitment proposals" },
 
+    "model_scout_research":  { "enabled": true, "cron": "30 4 * * 0", "//": "Model Scout · weekly official-catalog refresh" },
+    "model_scout_benchmark": { "enabled": true, "cron": "0 5 1 * *", "//": "Model Scout · monthly local fitness benchmark" },
+
     "morning_briefing": { "enabled": true, "cron": "30 7 * * *", "//": "Herald · the daily letter" },
     "herald_alerts":    { "enabled": true, "cron": "*/30 * * * *", "//": "Herald · quiet unless something broke" },
     "weekly_letter":    { "enabled": true, "cron": "0 9 * * 1",  "//": "Herald · Mondays 09:00" },
