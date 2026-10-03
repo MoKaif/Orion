@@ -1,5 +1,5 @@
 {
-  "//": "Chronos reads the primary Google Calendar and proposes mail-derived events for review.",
+  "//": "Chronos reads Calendar plus explicitly approved mail/journal sources and proposes events for review.",
   "enabled": true,
   "timezone": "Asia/Kolkata",
   "horizon_days": 31,
@@ -15,6 +15,16 @@
     "max_messages": 30,
     "max_bytes": 65536,
     "inference_batch": 6,
+    "inference_timeout_seconds": 1800
+  },
+  "journal": {
+    "enabled": true,
+    "//": "Vault-relative allowlist. Chronos reads no Obsidian folder not named here.",
+    "approved_paths": ["Journal"],
+    "lookback_days": 45,
+    "max_notes": 90,
+    "max_chars": 12000,
+    "inference_batch": 8,
     "inference_timeout_seconds": 1800
   }
 }

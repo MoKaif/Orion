@@ -34,12 +34,12 @@ def _is_enabled(tool: BaseTool) -> bool:
 
 def match(message: str) -> BaseTool | None:
     m = message.lower()
-    best, best_score = None, (0, 0)
+    best, best_score = None, (-1, 0, 0)
     for tool in all_tools():
         hits = [t for t in tool.triggers if t in m]
         if not hits:
             continue
-        score = (len(hits), max(len(t) for t in hits))
+        score = (tool.match_priority, len(hits), max(len(t) for t in hits))
         if score > best_score:
             best, best_score = tool, score
     return best

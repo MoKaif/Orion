@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from orion.core import plugin_sdk as orion
 
 from .specialist import CalendarSpecialist
-from .tools import UpcomingScheduleTool
+from .tools import CreateCalendarEventTool, UpcomingScheduleTool
 
 router = APIRouter()
 
@@ -20,12 +20,14 @@ def register() -> None:
     orion.add_agent(
         "chronos", "Chronos", tagline="Time and commitments",
         blurb="Keeps Orion aligned with your primary Google Calendar, scans Gmail read-only for "
-              "explicit upcoming commitments, and asks before adding anything inferred. Calendar "
-              "writes happen only when you approve the corresponding Inbox card.",
+              "explicit upcoming commitments from mail and approved journal folders, and asks "
+              "before adding anything inferred. Calendar writes happen only when you approve "
+              "the corresponding Inbox card or inline chat confirmation.",
         icon="calendar-days", accent="fact", plugin="chronos", order=32,
         summary=_summary, detail=_detail)
     orion.add_specialist(CalendarSpecialist())
     orion.add_tool(UpcomingScheduleTool())
+    orion.add_tool(CreateCalendarEventTool())
     orion.add_entity_type("calendar_event", "A confirmed time-bound commitment.", plugin="chronos")
     orion.add_job("chronos_calendar_sync", "*/30 * * * *", engine.sync_calendar,
                   agent="chronos", label="Sync Google Calendar",
@@ -35,6 +37,10 @@ def register() -> None:
                   description="Runs once nightly with a one-thread local-model budget, reads "
                               "recent Gmail without changing flags, and proposes explicit "
                               "calendar commitments for approval.")
+    orion.add_job("chronos_journal_scan", "40 0 * * *", engine.scan_journal,
+                  agent="chronos", label="Find commitments in Journal",
+                  description="Reads only approved Obsidian journal folders and proposes explicit "
+                              "future commitments for approval; it never edits a note.")
     orion.add_inbox_source("chronos", _inbox_items, plugin="chronos")
     orion.add_report_source("chronos", sections=report.sections, facts=report.facts,
                             plugin="chronos")
@@ -50,17 +56,19 @@ def status() -> dict[str, Any]:
         pending = store.proposals(c, limit=50)
         calendar_error = store.get_meta(c, "last_calendar_error") or ""
         mail_error = store.get_meta(c, "last_mail_error") or ""
+        journal_error = store.get_meta(c, "last_journal_error") or ""
         last_sync = store.get_meta(c, "last_calendar_sync")
         last_mail = store.get_meta(c, "last_mail_scan")
+        last_journal = store.get_meta(c, "last_journal_scan")
     finally:
         c.close()
-    healthy = authorized and not calendar_error and not mail_error
+    healthy = authorized and not calendar_error and not mail_error and not journal_error
     return {"ok": healthy,
             "state": "ready" if healthy else "authorization_required" if not authorized else "degraded",
-            "reason": calendar_error or mail_error or reason,
+            "reason": calendar_error or mail_error or journal_error or reason,
             "authorized": authorized, "confirmed_events": len(events),
             "pending_proposals": len(pending), "last_calendar_sync": last_sync,
-            "last_mail_scan": last_mail}
+            "last_mail_scan": last_mail, "last_journal_scan": last_journal}
 
 
 def _summary() -> dict[str, Any]:
@@ -109,14 +117,14 @@ def _inbox_items() -> list[dict[str, Any]]:
         c.close()
     return [{
         "origin": "chronos", "id": item["id"], "title": item["title"],
-        "body": f'{item["start_at"]} · {item.get("description") or "Explicit commitment found in mail."}',
+        "body": f'{item["start_at"]} · {item.get("description") or "Explicit commitment found."}',
         "effect": "Accept creates this event on your primary Google Calendar. Reject records "
-                  "the decision locally and changes neither Gmail nor Calendar.",
+                  "the decision locally and changes neither the source nor Calendar.",
         "created_at": item["created_at"], "prov_agent": "Chronos",
-        "prov_label": f'Mail · {item["confidence"]:.0%}',
+        "prov_label": f'{item["source_kind"].title()} · {item["confidence"]:.0%}',
         "action_url": f'/plugins/chronos/proposals/{item["id"]}',
         "payload": {"start_at": item["start_at"], "end_at": item.get("end_at"),
-                    "location": item.get("location")},
+                    "location": item.get("location"), "source": item.get("source_ref")},
         "actions": [orion.inbox_action("Add to Google Calendar", "accept", "accept"),
                     orion.inbox_action("Not an event", "reject", "reject")],
     } for item in pending]
@@ -142,7 +150,8 @@ async def api_authorize():
 @router.post("/sync")
 async def api_sync():
     from . import engine
-    return {"calendar": await engine.sync_calendar(), "mail": await engine.scan_mail()}
+    return {"calendar": await engine.sync_calendar(), "mail": await engine.scan_mail(),
+            "journal": await engine.scan_journal()}
 
 
 @router.get("/proposals")

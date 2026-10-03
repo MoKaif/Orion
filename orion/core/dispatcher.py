@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 from orion.core.providers import router
@@ -38,6 +39,7 @@ async def extract_args(tool: BaseTool, message: str) -> dict[str, Any] | None:
     prompt = (
         f"{verb} arguments for the tool '{tool.name}' ({tool.description}).\n"
         f"Argument schema (JSON): {json.dumps(tool.args_schema)}\n"
+        f"Current local datetime: {datetime.now().astimezone().isoformat(timespec='minutes')}\n"
         f"User message: {message}\n"
         "Return ONLY a JSON object of the arguments. No prose."
     )

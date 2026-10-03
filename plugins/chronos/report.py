@@ -19,7 +19,7 @@ def sections(scope: str) -> list[dict]:
         return []
     rows = [(event["start_at"].replace("T", " ")[:16], event["summary"])
             for event in selected[:8]]
-    note = f"{len(pending)} mail-derived event proposal(s) await approval." if pending else ""
+    note = f"{len(pending)} event proposal(s) await approval." if pending else ""
     return [{"heading": "Chronos", "blurb": f"{len(selected)} confirmed event(s) in the next {days} days.",
              "rows": rows, "bullets": [], "accent": "#60a5fa", "note": note}]
 

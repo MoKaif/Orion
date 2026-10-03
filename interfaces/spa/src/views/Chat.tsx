@@ -8,6 +8,14 @@ interface Msg {
   content: string;
 }
 
+interface Confirmation {
+  id: number;
+  tool: string;
+  args: Record<string, unknown>;
+  state: "pending" | "running" | "executed" | "cancelled" | "failed";
+  output?: string;
+}
+
 export default function Chat() {
   const navigate = useNavigate();
   const { sessionId: sessionParam } = useParams();
@@ -18,6 +26,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus] = useState("");
+  const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<AbortController | null>(null);
 
@@ -43,7 +52,36 @@ export default function Chat() {
     setInput("");
     setStreaming(false);
     setStatus("");
+    setConfirmations([]);
     navigate("/chat", { replace: true });
+  }
+
+  async function decide(id: number, approve: boolean) {
+    setConfirmations((items) => items.map((item) =>
+      item.id === id ? { ...item, state: approve ? "running" : "cancelled" } : item));
+    if (!approve) {
+      await fetch(`/confirm/${id}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: false }),
+      }).catch(() => {});
+      return;
+    }
+    try {
+      const response = await fetch(`/confirm/${id}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      });
+      const result = await response.json();
+      const succeeded = response.ok && result.ok !== false && !result.error;
+      setConfirmations((items) => items.map((item) => item.id === id ? {
+        ...item,
+        state: succeeded ? "executed" : "failed",
+        output: result.output || result.error || "The action could not be completed.",
+      } : item));
+    } catch {
+      setConfirmations((items) => items.map((item) =>
+        item.id === id ? { ...item, state: "failed", output: "Confirmation request failed." } : item));
+    }
   }
 
   function stop() {
@@ -103,6 +141,12 @@ export default function Chat() {
             });
           else if (ev.type === "context") setStatus(`${ev.mode || ""} · ${ev.specialist || "generalist"}`);
           else if (ev.type === "tool") setStatus(`using ${ev.tool || "a tool"}…`);
+          else if (ev.type === "confirm") {
+            setConfirmations((items) => [...items, {
+              id: ev.id, tool: ev.tool, args: ev.args || {}, state: "pending",
+            }]);
+            setStatus("waiting for your approval");
+          }
           else if (ev.type === "fallback") setStatus(`switched to ${ev.answered_by || "fallback"}…`);
           else if (ev.type === "error") throw new Error(ev.message || "chat failed");
           else if (ev.type === "done") setStatus("");
@@ -146,7 +190,7 @@ export default function Chat() {
             <h2>What are we thinking through?</h2>
             <p>Orion begins with your world model, then chooses the right specialist and tools.</p>
             <div className="chat-suggestions">
-              {["What needs my attention today?", "What changed across my projects?", "Summarize what you know about my health", "Connect recent ideas I may have missed"].map((prompt) => (
+              {["What needs my attention today?", "Add a calendar event: planning review tomorrow at 10:00", "Summarize what you know about my health", "Connect recent ideas I may have missed"].map((prompt) => (
                 <button key={prompt} onClick={() => setInput(prompt)}><Sparkles size={12}/>{prompt}</button>
               ))}
             </div>
@@ -159,6 +203,25 @@ export default function Chat() {
               {m.content || (streaming && i === messages.length - 1 ? <em className="typing">…</em> : "")}
             </div>
           </div>
+        ))}
+        {confirmations.map((item) => (
+          <section className={`chat-confirm ${item.state}`} key={item.id} aria-live="polite">
+            <p className="eyebrow">Approval required</p>
+            <strong>{item.tool === "create_calendar_event" ? "Add this to Google Calendar?" : `Run ${item.tool}?`}</strong>
+            <dl>
+              {Object.entries(item.args).filter(([, value]) => value != null && value !== "").map(([key, value]) => (
+                <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value)}</dd></div>
+              ))}
+            </dl>
+            {item.state === "pending" && <div className="chat-confirm-actions">
+              <button className="btn btn-primary btn-sm" onClick={() => decide(item.id, true)}>Approve &amp; create</button>
+              <button className="btn btn-sm" onClick={() => decide(item.id, false)}>Cancel</button>
+            </div>}
+            {item.state === "running" && <p className="muted">Creating event…</p>}
+            {item.state === "executed" && <p className="chat-confirm-result ok">{item.output || "Event created."}</p>}
+            {item.state === "cancelled" && <p className="muted">Cancelled. Nothing was added.</p>}
+            {item.state === "failed" && <p className="chat-confirm-result error">{item.output}</p>}
+          </section>
         ))}
         <div ref={endRef} />
       </div>

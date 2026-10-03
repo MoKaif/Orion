@@ -121,8 +121,9 @@ reference implementation.
 
 1. **Chat responsiveness and usability** — measure the foreground path, remove avoidable local
    model latency, and improve cancellation, retry, session handling, and activity feedback.
-2. **Chronos expansion** — extend the shipped Google Calendar and read-only mail foundation to
-   approved Obsidian notes, then improve commitment extraction from real-world messages.
+2. **Chronos expansion** — Google Calendar, read-only mail, and explicitly allowlisted Obsidian
+   Journal entries now feed review-gated commitments; keep improving extraction against
+   real-world messages and journal phrasing.
 3. **Inbound mail intelligence** — extend Chronos's restricted read-only IMAP source to route
    relevant facts and proposed actions to Treasurer, Maintainer, and the Review Inbox without
    duplicating the mailbox in Orion.
@@ -133,9 +134,11 @@ reference implementation.
       weekly personal-baseline comparisons, constrains LLM prose to those facts, and contributes
       the resulting account to Herald without making medical claims.
 - [x] **Chronos / calendar** (`plugins/chronos/`) — reads the primary Google Calendar, scans a
-      bounded slice of recent mail read-only in a low-CPU nightly job, proposes explicit
-      commitments through the Review Inbox, and writes private calendar events only after user
-      approval. OAuth credentials and tokens remain outside Git and Docker image layers.
+      bounded slice of recent mail and explicitly allowlisted Obsidian Journal entries read-only
+      in low-CPU nightly jobs, proposes explicit commitments through the Review Inbox, and writes
+      private calendar events only after approval. Chat can also create an event through the same
+      mandatory confirmation gate. OAuth credentials and tokens remain outside Git and Docker
+      image layers.
 - [ ] Content plugin: `operations` specialist + tools.
 - [x] **Treasurer / finance** (`plugins/finance/`) — reads FinStrive without changing it,
       learns personal expected-spending ranges locally, detects category and transaction

@@ -31,6 +31,7 @@
 
     "chronos_calendar_sync": { "enabled": true, "cron": "*/30 * * * *", "//": "Chronos · refresh primary Google Calendar" },
     "chronos_mail_scan":     { "enabled": true, "cron": "20 0 * * *", "//": "Chronos · nightly low-CPU commitment scan" },
+    "chronos_journal_scan":  { "enabled": true, "cron": "40 0 * * *", "//": "Chronos · approved Journal entries to commitment proposals" },
 
     "morning_briefing": { "enabled": true, "cron": "30 7 * * *", "//": "Herald · the daily letter" },
     "herald_alerts":    { "enabled": true, "cron": "*/30 * * * *", "//": "Herald · quiet unless something broke" },

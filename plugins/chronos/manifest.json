@@ -1,17 +1,18 @@
 {
-  "//": "Chronos — calendar awareness and review-gated commitments inferred from mail.",
+  "//": "Chronos — calendar awareness and review-gated commitments inferred from approved sources.",
   "name": "chronos",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "specialists": ["calendar"],
   "agents": ["chronos"],
-  "tools": ["upcoming_schedule"],
+  "tools": ["upcoming_schedule", "create_calendar_event"],
   "entity_types": ["calendar_event"],
   "relationship_types": [],
   "background_jobs": [
     {"name": "chronos_calendar_sync", "cron": "*/30 * * * *"},
-    {"name": "chronos_mail_scan", "cron": "20 0 * * *"}
+    {"name": "chronos_mail_scan", "cron": "20 0 * * *"},
+    {"name": "chronos_journal_scan", "cron": "40 0 * * *"}
   ],
   "api_routes": ["/plugins/chronos/status", "/plugins/chronos/authorize", "/plugins/chronos/sync", "/plugins/chronos/proposals"],
   "dashboard_widgets": ["chronos_upcoming"],
-  "permissions": ["read_google_calendar", "read_mail_headers_and_text", "propose_calendar_events", "write_calendar_after_approval"]
+  "permissions": ["read_google_calendar", "read_mail_headers_and_text", "read_approved_journal_entries", "propose_calendar_events", "write_calendar_after_approval"]
 }

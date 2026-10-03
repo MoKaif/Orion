@@ -27,6 +27,7 @@ class BaseTool(ABC):
     args_schema: dict[str, Any] = {}
     requires_confirm: bool = False          # irreversible actions gate through identity/approval
     dispatch_mode: str = "extract"          # "extract" (args in message) | "generate" (model composes)
+    match_priority: int = 0                 # resolve intentional overlap (for example read vs write)
 
     @abstractmethod
     async def run(self, args: dict[str, Any]) -> ToolResult: ...
