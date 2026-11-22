@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, MessageSquare } from "lucide-react";
 import { useSessions } from "../api";
@@ -15,9 +16,12 @@ function formatDate(value?: string) {
 }
 
 export default function Sessions() {
-  const { data, isLoading } = useSessions();
+  const [query, setQuery] = useState("");
+  const { data, isLoading, isError, refetch } = useSessions();
   if (isLoading) return <Loading label="Loading sessions…" />;
+  if (isError && !data) return <p role="alert">Could not load conversations. <button className="btn" onClick={() => refetch()}>Retry</button></p>;
   const sessions = data ?? [];
+  const visible = sessions.filter(s => (s.title || `Session #${s.id}`).toLowerCase().includes(query.trim().toLowerCase()));
 
   return (
     <>
@@ -30,14 +34,18 @@ export default function Sessions() {
         <span className="view-count">{sessions.length} conversations</span>
       </header>
 
-      {sessions.length === 0 ? (
+      <div className="directory-tools">
+        <input type="search" aria-label="Search conversations" placeholder="Search conversation titles…" value={query} onChange={e => setQuery(e.target.value)} />
+        <Link className="btn btn-primary" to="/chat"><MessageSquare size={14}/> New chat</Link>
+      </div>
+      {visible.length === 0 ? (
         <div className="empty-state">
           <span className="empty-glyph">◇</span>
-          <p>No sessions yet. Start a chat and it will appear here.</p>
+          <p>{sessions.length ? "No conversations match your search." : "Your conversations will appear here."}</p>
         </div>
       ) : (
         <ul className="session-list">
-          {sessions.map((s) => (
+          {visible.map((s) => (
             <li key={s.id}>
               <Link to={`/chat/${s.id}`} className="session-row">
                 <span className="session-icon"><MessageSquare size={17} /></span>

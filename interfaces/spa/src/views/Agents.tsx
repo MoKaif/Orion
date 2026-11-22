@@ -1,4 +1,4 @@
-import { CSSProperties } from "react";
+import { CSSProperties, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BookOpen,
@@ -105,8 +105,13 @@ function Card({ agent }: { agent: AgentCard }) {
 }
 
 export default function Agents() {
-  const { data, isLoading } = useAgents();
+  const [query, setQuery] = useState("");
+  const [failedOnly, setFailedOnly] = useState(false);
+  const { data, isLoading, isError, refetch } = useAgents();
+  if (isError && !data) return <p role="alert">Could not load agents. <button className="btn" onClick={() => refetch()}>Retry</button></p>;
   if (isLoading || !data) return <Loading label="Gathering agents…" />;
+
+  const visible = data.filter(a => (!failedOnly || a.failing.length > 0) && [a.title, a.name, a.tagline, a.plugin].join(" ").toLowerCase().includes(query.trim().toLowerCase()));
 
   return (
     <>
@@ -122,14 +127,19 @@ export default function Agents() {
         <span className="view-count">{data.length} active specialists</span>
       </header>
 
-      {data.length === 0 ? (
+      <div className="directory-tools">
+        <input type="search" aria-label="Search agents" placeholder="Search agents…" value={query} onChange={e => setQuery(e.target.value)}/>
+        <button className="btn" aria-pressed={failedOnly} onClick={() => setFailedOnly(!failedOnly)}>Failed jobs</button>
+        <span role="status">{visible.length} of {data.length}</span>
+      </div>
+      {visible.length === 0 ? (
         <div className="empty-state">
           <span className="empty-glyph">◷</span>
-          No agents are registered yet. A plugin adds one by calling <code>add_agent</code>.
+          {data.length ? "No agents match these filters." : "No agents are registered yet."}
         </div>
       ) : (
         <div className="agent-grid">
-          {data.map((a) => (
+          {visible.map((a) => (
             <Card key={a.name} agent={a} />
           ))}
         </div>

@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useInbox } from "../api";
 import Telemetry from "./Telemetry";
-import OrbitMark from "./OrbitMark";
 import SettingsModal from "./SettingsModal";
 import "./shell.css";
 
@@ -38,9 +37,9 @@ export default function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`shell${teleCollapsed ? " tele-collapsed" : ""}`}>
-      <nav className="rail">
+      <nav className="rail" aria-label="Main navigation">
         <div className="brand">
-          <span className="brand-mark"><OrbitMark size={34} /></span>
+          <span className="brand-mark"><img src="/assets/orion-mark.svg" alt="" /></span>
           <div>
             <div className="brand-name">Orion</div>
             <div className="brand-sub">Knowledge OS</div>
@@ -51,6 +50,8 @@ export default function Shell({ children }: { children: ReactNode }) {
           {NAV.map(({ to, label, icon: Icon, end }) => (
             <li key={to}>
               <NavLink
+                aria-label={label}
+                title={label}
                 to={to}
                 end={end}
                 className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
@@ -66,7 +67,7 @@ export default function Shell({ children }: { children: ReactNode }) {
         </ul>
 
         <div className="nav-foot">
-          <button className="nav-item settings-trigger" onClick={() => setSettingsOpen(true)}>
+          <button aria-label="Settings" title="Settings" className="nav-item settings-trigger" onClick={() => setSettingsOpen(true)}>
             <Settings size={17} strokeWidth={1.9} /><span>Settings</span>
           </button>
         </div>

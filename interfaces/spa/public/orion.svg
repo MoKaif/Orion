@@ -1,11 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Orion">
   <defs>
-    <radialGradient id="core" cx="30%" cy="24%"><stop stop-color="#b9d6ff"/><stop offset=".36" stop-color="#4169bd"/><stop offset=".72" stop-color="#111b38"/><stop offset="1" stop-color="#070b14"/></radialGradient>
-    <linearGradient id="ring" x1="8" y1="5" x2="57" y2="59"><stop stop-color="#e0ecff"/><stop offset=".45" stop-color="#60a5fa"/><stop offset=".82" stop-color="#7c6ff2"/></linearGradient>
-    <filter id="glow"><feGaussianBlur stdDeviation="1.7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="ring" x1="31" y1="10" x2="89" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f3f8ff"/><stop offset=".42" stop-color="#b4d5ff"/>
+      <stop offset=".78" stop-color="#6685f9"/><stop offset="1" stop-color="#abcaff"/>
+    </linearGradient>
+    <radialGradient id="shade" cx="29%" cy="76%" r="84%">
+      <stop stop-color="#040a10"/><stop offset=".57" stop-color="#070e19"/>
+      <stop offset=".78" stop-color="#182842"/><stop offset=".93" stop-color="#637fa9"/>
+      <stop offset="1" stop-color="#e1edff"/>
+    </radialGradient>
+    <linearGradient id="moon" x2=".45" y2="1">
+      <stop stop-color="#f7fbff"/><stop offset=".43" stop-color="#bfdcff"/><stop offset="1" stop-color="#7399ff"/>
+    </linearGradient>
+    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+    <path id="arc" d="M95.5 19.5 A54.5 54.5 0 1 0 114.2 42.8"/>
   </defs>
-  <rect width="64" height="64" rx="15" fill="#0b111c"/>
-  <circle cx="31" cy="33" r="12" fill="url(#core)"/>
-  <path d="M49 17A24 24 0 1 0 54 29" fill="none" stroke="url(#ring)" stroke-width="3.2" stroke-linecap="round" filter="url(#glow)"/>
-  <circle cx="52" cy="20" r="3.5" fill="#a8c9ff" filter="url(#glow)"/>
+  <circle cx="64" cy="64" r="30" fill="url(#shade)"/>
+  <g fill="none" stroke-linecap="butt">
+    <use href="#arc" stroke="#6d9dff" stroke-width="5" opacity=".38" filter="url(#halo)"/>
+    <use href="#arc" stroke="url(#ring)" stroke-width="3.8"/>
+  </g>
+  <circle cx="106.5" cy="30" r="8.3" fill="#77a2ff" opacity=".48" filter="url(#halo)"/>
+  <circle cx="106.5" cy="30" r="7.2" fill="url(#moon)"/>
 </svg>

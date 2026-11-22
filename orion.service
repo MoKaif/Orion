@@ -8,8 +8,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Orion
-ExecStart=%h/Orion/.venv/bin/python run.py
+WorkingDirectory=%h/Developing-Environment/Orion-v2
+ExecStart=%h/Developing-Environment/Orion-v2/.venv/bin/python -m uvicorn orion.core.api.app:app --host 127.0.0.1 --port 18020
 Restart=always
 RestartSec=5
 # Keep it a good citizen on a shared, low-RAM machine.
