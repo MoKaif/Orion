@@ -9,6 +9,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from orion.core.config import config
+from orion.core.cognition import Mode
 from orion.core.providers import router
 from orion.core.providers.base import Message
 
@@ -83,11 +84,11 @@ async def extract(mail: dict[str, str]) -> dict[str, Any] | None:
     return items[0] if items else None
 
 
-async def _unload(provider) -> None:
+async def _unload(provider, model: str | None = None) -> None:
     """Stop an interrupted Ollama generation from surviving as an orphan CPU worker."""
     try:
         async with asyncio.timeout(10):
-            await provider.complete([], keep_alive=0, options={"num_predict": 1})
+            await provider.complete([], keep_alive=0, options={"num_predict": 1}, model=model)
     except Exception:
         pass
 
@@ -97,11 +98,11 @@ async def extract_many(messages: list[dict[str, str]], *, source_kind: str = "ma
     if not messages:
         return []
     cfg = config.section("chronos")
+    model = cfg.get(source_kind, {}).get("model")
     zone = ZoneInfo(str(cfg.get("timezone", "Asia/Kolkata")))
     now = datetime.now(zone)
     provider = router.get("ollama")
-    if provider is None or not await provider.is_available():
-        return None
+    available = provider is not None and await provider.is_available()
     payload = {"NOW": now.isoformat(timespec="minutes"), "TIMEZONE": str(zone),
                "SOURCE_KIND": source_kind, "RECORDS": [
         {"REF": item["fingerprint"], "AUTHOR_OR_SOURCE": item.get("from"),
@@ -109,22 +110,51 @@ async def extract_many(messages: list[dict[str, str]], *, source_kind: str = "ma
          "TEXT_PREFIX": (item.get("text") or "")[:1200]}
         for item in messages
     ]}
+    prompts = [Message("system", _SYSTEM),
+               Message("user", "SOURCE_RECORDS_JSON\n" + json.dumps(payload, ensure_ascii=False))]
     try:
-        timeout = max(60, min(3600, int(cfg.get(source_kind, {}).get(
+        if not available:
+            raise RuntimeError("Local extraction unavailable")
+        timeout = max(10, min(3600, int(cfg.get(source_kind, {}).get(
             "inference_timeout_seconds", 120))))
         async with asyncio.timeout(timeout):
-            raw = await provider.complete([
-                Message("system", _SYSTEM),
-                Message("user", "SOURCE_RECORDS_JSON\n" + json.dumps(payload, ensure_ascii=False)),
-            ], options=_LOW_IMPACT_OPTIONS, keep_alive=0)
+            raw = await provider.complete(prompts, options=_LOW_IMPACT_OPTIONS, keep_alive=0,
+               model=model, response_format={
+                   "type": "array", "items": {
+                       "type": "object",
+                       "required": ["ref", "title", "start_at", "confidence"],
+                       "properties": {
+                           "ref": {"type": "string", "enum": [m["fingerprint"] for m in messages]},
+                           "title": {"type": "string"},
+                           "start_at": {"type": "string"},
+                           "confidence": {"type": "number"},
+                       },
+                       "additionalProperties": False,
+                   },
+               })
     except asyncio.CancelledError:
-        await asyncio.shield(_unload(provider))
+        await asyncio.shield(_unload(provider, model))
         raise
     except TimeoutError:
-        await _unload(provider)
+        await _unload(provider, model)
+        raw = ""
+    except Exception:
+        raw = ""
+    result = _parse_response(raw, messages, now, cfg)
+    if result is not None:
+        return result
+    if not cfg.get(source_kind, {}).get("allow_cloud_fallback", False):
         return None
+    try:
+        async with asyncio.timeout(45):
+            chunks = [token async for token in router.route(Mode.REFLEX, prompts)]
+        return _parse_response("".join(chunks), messages, now, cfg)
     except Exception:
         return None
+
+
+def _parse_response(raw, messages, now, cfg):
+    """Keep invalid or low-confidence output pending rather than losing the source."""
     text = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     left, right = text.find("["), text.rfind("]")
     if left < 0 or right < left:
@@ -137,10 +167,14 @@ async def extract_many(messages: list[dict[str, str]], *, source_kind: str = "ma
     out = []
     for raw_item in raw_items if isinstance(raw_items, list) else []:
         if not isinstance(raw_item, dict) or raw_item.get("ref") not in allowed:
-            continue
+            return None
         item = _parse(json.dumps(raw_item), today=now.date(),
                       horizon=max(1, int(cfg.get("horizon_days", 31))))
         if item:
+            if item["confidence"] < 0.55:
+                return None
             item["source_ref"] = raw_item["ref"]
             out.append(item)
+        else:
+            return None
     return out

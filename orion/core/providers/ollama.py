@@ -18,17 +18,21 @@ class OllamaProvider(BaseProvider):
         return config.provider_cfg("ollama")
 
     def _payload(self, messages: list[Message], stream: bool, *,
-                 options: dict | None = None, keep_alive: str | int = "30m") -> dict:
+                 options: dict | None = None, keep_alive: str | int = "30m",
+                 model: str | None = None, response_format: dict | None = None) -> dict:
         cfg = self._cfg()
         request_options = {"num_ctx": cfg.get("context_window", 4096)}
         request_options.update(options or {})
-        return {
-            "model": cfg.get("model", "qwen2.5:3b-instruct-q4_K_M"),
+        payload = {
+            "model": model or cfg.get("model", "qwen2.5:3b-instruct-q4_K_M"),
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": stream,
             "keep_alive": keep_alive,
             "options": request_options,
         }
+        if response_format is not None:
+            payload["format"] = response_format
+        return payload
 
     @staticmethod
     def _timeout() -> httpx.Timeout:
@@ -54,7 +58,8 @@ class OllamaProvider(BaseProvider):
                              json=self._payload(
                                  messages, stream=False,
                                  options=kw.get("options"),
-                                 keep_alive=kw.get("keep_alive", "30m")))
+                                 keep_alive=kw.get("keep_alive", "30m"), model=kw.get("model"),
+                                 response_format=kw.get("response_format")))
             r.raise_for_status()
             return r.json().get("message", {}).get("content", "")
 
@@ -64,7 +69,7 @@ class OllamaProvider(BaseProvider):
                                  json=self._payload(
                                      messages, stream=True,
                                      options=kw.get("options"),
-                                     keep_alive=kw.get("keep_alive", "30m"))) as r:
+                                     keep_alive=kw.get("keep_alive", "30m"), model=kw.get("model"))) as r:
                 r.raise_for_status()
                 async for line in r.aiter_lines():
                     if not line.strip():

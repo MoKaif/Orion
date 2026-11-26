@@ -28,6 +28,36 @@ class ChronosInferenceTests(unittest.TestCase):
 
 
 class ChronosInferenceResourceTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        settings = patch.object(inference.config, "section", return_value={})
+        settings.start()
+        self.addCleanup(settings.stop)
+
+    async def test_authorized_cloud_fallback_works_when_local_is_offline(self):
+        provider = MagicMock()
+        provider.is_available = AsyncMock(return_value=False)
+
+        async def cloud(*args, **kwargs):
+            yield '[]'
+
+        message = {"fingerprint": "mail-1", "subject": "Meeting tomorrow"}
+        with (patch.object(inference.router, "get", return_value=provider),
+              patch.object(inference.router, "route", side_effect=cloud) as route,
+              patch.object(inference.config, "section", return_value={
+                  "mail": {"allow_cloud_fallback": True}})):
+            self.assertEqual(await inference.extract_many([message]), [])
+        self.assertEqual(route.call_count, 1)
+
+    async def test_local_failure_never_sends_excerpts_without_opt_in(self):
+        provider = MagicMock()
+        provider.is_available = AsyncMock(return_value=False)
+        message = {"fingerprint": "mail-1", "subject": "Meeting tomorrow"}
+        with (patch.object(inference.router, "get", return_value=provider),
+              patch.object(inference.router, "route") as route,
+              patch.object(inference.config, "section", return_value={})):
+            self.assertIsNone(await inference.extract_many([message]))
+        route.assert_not_called()
+
     async def test_malformed_output_keeps_source_pending(self):
         provider = MagicMock()
         provider.is_available = AsyncMock(return_value=True)
