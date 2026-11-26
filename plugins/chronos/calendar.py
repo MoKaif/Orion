@@ -40,7 +40,15 @@ def _credentials():
         raise RuntimeError("Google Calendar authorization is waiting; run scripts/authorize_chronos.py")
     creds = Credentials.from_authorized_user_file(str(path), SCOPES)
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        from google.auth.exceptions import RefreshError
+        try:
+            creds.refresh(Request())
+        except RefreshError as exc:
+            raise RuntimeError(
+                "Google Calendar authorization expired or was revoked. "
+                "Run .venv/bin/python scripts/authorize_chronos.py on the host "
+                "and complete Google sign-in to reconnect."
+            ) from exc
         path.write_text(creds.to_json())
         path.chmod(0o600)
     if not creds.valid:

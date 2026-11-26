@@ -9,6 +9,23 @@ from plugins.herald import mailer
 
 
 class SchedulerJobTypeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_returned_failure_is_recorded_as_failure(self):
+        for result in ({"ok": False, "error": "offline"},
+                       {"grammar": {"ok": False, "error": "timeout"}}):
+            scheduler = Scheduler()
+            job = ScheduledJob("failed", "0 0 * * *", lambda: result)
+            with patch.object(scheduler, "_record_run") as record:
+                await scheduler._execute(job)
+            self.assertIs(record.call_args.args[1], False)
+
+    async def test_empty_success_and_deferred_work_are_not_failures(self):
+        for result in ({"ok": True, "deferred": 3}, [], None):
+            scheduler = Scheduler()
+            job = ScheduledJob("success", "0 0 * * *", lambda: result)
+            with patch.object(scheduler, "_record_run") as record:
+                await scheduler._execute(job)
+            self.assertIs(record.call_args.args[1], True)
+
     async def test_sync_job_result_is_not_awaited(self):
         scheduler = Scheduler()
         job = ScheduledJob("sync", "0 0 * * *", lambda: {"created": True})

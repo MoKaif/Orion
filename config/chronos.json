@@ -14,8 +14,8 @@
     "lookback_days": 14,
     "max_messages": 30,
     "max_bytes": 65536,
-    "inference_batch": 6,
-    "inference_timeout_seconds": 1800
+    "inference_batch": 1,
+    "inference_timeout_seconds": 120
   },
   "journal": {
     "enabled": true,
@@ -24,7 +24,7 @@
     "lookback_days": 45,
     "max_notes": 90,
     "max_chars": 12000,
-    "inference_batch": 8,
-    "inference_timeout_seconds": 1800
+    "inference_batch": 1,
+    "inference_timeout_seconds": 120
   }
 }

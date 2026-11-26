@@ -34,7 +34,8 @@ record. Copy its REF exactly into each result. Item schema:
 """
 
 _LOW_IMPACT_OPTIONS = {
-    "num_thread": 1,   # Chronos runs overnight; protect the small host, not latency.
+    "num_thread": 2,   # Bound CPU use while allowing the dual-core host to finish prefill.
+    "num_ctx": 2048,
     "num_batch": 32,
     "num_predict": 384,
     "temperature": 0,
@@ -110,7 +111,7 @@ async def extract_many(messages: list[dict[str, str]], *, source_kind: str = "ma
     ]}
     try:
         timeout = max(60, min(3600, int(cfg.get(source_kind, {}).get(
-            "inference_timeout_seconds", 1800))))
+            "inference_timeout_seconds", 120))))
         async with asyncio.timeout(timeout):
             raw = await provider.complete([
                 Message("system", _SYSTEM),
@@ -127,11 +128,11 @@ async def extract_many(messages: list[dict[str, str]], *, source_kind: str = "ma
     text = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     left, right = text.find("["), text.rfind("]")
     if left < 0 or right < left:
-        return []
+        return None  # Invalid output must not mark these records as processed.
     try:
         raw_items = json.loads(text[left:right + 1])
     except json.JSONDecodeError:
-        return []
+        return None
     allowed = {mail["fingerprint"] for mail in messages}
     out = []
     for raw_item in raw_items if isinstance(raw_items, list) else []:

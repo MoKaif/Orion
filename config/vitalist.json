@@ -4,7 +4,7 @@
   "timezone": "Asia/Kolkata",
   "perseus": {
     "//": "Override with PERSEUS_BASE_URL when Perseus is not on this loopback address.",
-    "base_url": "http://127.0.0.1:8080",
+    "base_url": "https://archlinux.tailf3c67d.ts.net",
     "timeout_seconds": 12
   },
   "analysis": {

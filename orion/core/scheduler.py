@@ -8,6 +8,7 @@ is disabled but jobs can still be triggered on demand (POST /jobs/{name}/run).
 from __future__ import annotations
 
 import asyncio
+import ast
 import inspect
 import json
 import logging
@@ -26,6 +27,17 @@ Job = Callable[[], object | Awaitable[object]]
 
 _RUNS_FILE = config.root() / "data" / "job_runs.json"
 _HISTORY_KEEP = 20   # runs kept per job in the persisted log
+
+
+def result_failed(result: object) -> bool:
+    """A returned failure is still a failure, including composite plugin jobs."""
+    if isinstance(result, dict):
+        return (result.get("ok") is False or bool(result.get("error"))
+                or any(result_failed(value) for value in result.values()
+                       if isinstance(value, (dict, list))))
+    if isinstance(result, list):
+        return any(result_failed(value) for value in result)
+    return False
 
 
 def _job_cfg(name: str) -> dict:
@@ -98,6 +110,16 @@ class Scheduler:
         if self._history is None:
             try:
                 self._history = json.loads(_RUNS_FILE.read_text())
+                # Older histories recorded only whether the callable raised. Correct
+                # complete legacy results on read so Herald sees existing failures too.
+                for runs in self._history.values():
+                    for run in runs:
+                        try:
+                            result = ast.literal_eval(run.get("result", ""))
+                        except (ValueError, SyntaxError, TypeError):
+                            continue
+                        if result_failed(result):
+                            run["ok"] = False
             except Exception:
                 self._history = {}
         return self._history.get(name, [])
@@ -127,7 +149,7 @@ class Scheduler:
             result = job.run()
             if inspect.isawaitable(result):
                 result = await result
-            ok = True
+            ok = not result_failed(result)
         except Exception as e:
             log.warning("job %s failed: %s", job.name, e)
             result, ok = {"error": str(e)}, False

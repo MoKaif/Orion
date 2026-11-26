@@ -28,6 +28,14 @@ class ChronosInferenceTests(unittest.TestCase):
 
 
 class ChronosInferenceResourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_malformed_output_keeps_source_pending(self):
+        provider = MagicMock()
+        provider.is_available = AsyncMock(return_value=True)
+        provider.complete = AsyncMock(return_value="I could not parse that record")
+        message = {"fingerprint": "mail-1", "subject": "Meeting tomorrow"}
+        with patch.object(inference.router, "get", return_value=provider):
+            self.assertIsNone(await inference.extract_many([message]))
+
     async def test_mail_extraction_caps_cpu_and_unloads_model(self):
         provider = MagicMock()
         provider.is_available = AsyncMock(return_value=True)
@@ -39,7 +47,7 @@ class ChronosInferenceResourceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await inference.extract_many([message]), [])
 
         kwargs = provider.complete.await_args.kwargs
-        self.assertEqual(kwargs["options"]["num_thread"], 1)
+        self.assertEqual(kwargs["options"]["num_thread"], 2)
         self.assertEqual(kwargs["options"]["num_predict"], 384)
         self.assertEqual(kwargs["keep_alive"], 0)
 

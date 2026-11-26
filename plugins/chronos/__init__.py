@@ -34,7 +34,7 @@ def register() -> None:
                   description="Refreshes the read-only local view of the next month.")
     orion.add_job("chronos_mail_scan", "20 0 * * *", engine.scan_mail,
                   agent="chronos", label="Find commitments in mail",
-                  description="Runs once nightly with a one-thread local-model budget, reads "
+                  description="Runs once nightly with a bounded local-model budget, reads "
                               "recent Gmail without changing flags, and proposes explicit "
                               "calendar commitments for approval.")
     orion.add_job("chronos_journal_scan", "40 0 * * *", engine.scan_journal,

@@ -24,7 +24,7 @@ from orion.core.providers import router
 from orion.core.providers.base import Message
 from orion.core.specialists import Specialist
 from orion.core.tools import registry, selection
-from orion.core.tools.base import BaseTool
+from orion.core.tools.base import BaseTool, ToolResult
 from orion.core.world_model import world_model
 from orion.core.world_model.extract import extract_candidates
 
@@ -77,7 +77,8 @@ class Context:
                 "detail just isn't in your recalled memory yet. Say that and offer to look deeper "
                 "or re-mine the relevant notes; never claim you cannot access his files.")
         if self.tool_result:
-            parts.append("A tool was run for this turn; use its result:\n" + self.tool_result)
+            parts.append("Tool execution status for this turn. Do not claim an action completed "
+                         "unless a successful result below confirms it:\n" + self.tool_result)
         return "\n\n".join(parts)
 
     def system_prompt(self) -> str:
@@ -121,8 +122,17 @@ async def _maybe_run_tool(ctx: Context, on_event: Callable[[dict], None] | None,
     if primary is None or primary.name not in {t.name for t in selected}:
         return
 
-    args = await dispatcher.extract_args(primary, ctx.message)
+    try:
+        async with asyncio.timeout(30):
+            args = await dispatcher.extract_args(primary, ctx.message)
+    except TimeoutError:
+        args = None
     if args is None:                     # no local model available, or unparseable — skip cleanly
+        ctx.tool_result = (f"Tool '{primary.name}' was NOT executed: argument extraction "
+                           "was unavailable, timed out, or returned invalid arguments. "
+                           "Explain this limitation; do not present a guessed result.")
+        if on_event:
+            on_event({"type": "tool", "tool": primary.name, "ok": False})
         return
 
     if identity.needs_approval(primary.name) or primary.requires_confirm:
@@ -133,7 +143,14 @@ async def _maybe_run_tool(ctx: Context, on_event: Callable[[dict], None] | None,
         ctx.tool_result = f"[awaiting user confirmation to run '{primary.name}' with {args}]"
         return
 
-    result = await primary.run(args)
+    try:
+        async with asyncio.timeout(60):
+            result = await primary.run(args)
+    except TimeoutError:
+        result = ToolResult(False, f"Tool '{primary.name}' timed out; completion is unconfirmed.")
+    except Exception as exc:
+        result = ToolResult(False, f"Tool '{primary.name}' failed ({type(exc).__name__}); "
+                            "completion is unconfirmed.")
     if on_event:
         on_event({"type": "tool", "tool": primary.name, "ok": result.ok})
     ctx.tool_result = result.format_for_context()
