@@ -139,13 +139,16 @@ def _run_tally(runs: list[dict[str, Any]], limit: int = 10) -> list[tuple[str, s
     """
     tally: dict[str, Counter] = {}
     for r in runs:
-        tally.setdefault(r["label"], Counter())["ok" if r.get("ok") else "failed"] += 1
+        state = "deferred" if r.get("status") == "deferred" else "ok" if r.get("ok") else "failed"
+        tally.setdefault(r["label"], Counter())[state] += 1
 
     rows = []
     for label, c in sorted(tally.items(), key=lambda kv: (-kv[1]["failed"], -sum(kv[1].values()))):
-        total = c["ok"] + c["failed"]
+        total = sum(c.values())
         if c["failed"]:
             rows.append((label, f"{c['failed']} failed of {total}"))
+        elif c["deferred"]:
+            rows.append((label, f"{c['ok']} completed, {c['deferred']} deferred"))
         else:
             rows.append((label, "ok" if total == 1 else f"ok ×{total}"))
     return rows[:limit]
@@ -214,7 +217,12 @@ _FOOTER = ("Sent by Herald, Orion's mail agent, from your own machine. Retune wh
 async def morning_briefing() -> dict:
     """Daily: what ran overnight, what is waiting on you, what it cost."""
     runs = _runs_since(18)
-    failures = [r for r in runs if not r.get("ok")]
+    failed_runs = [r for r in runs if not r.get("ok")]
+    # Count affected jobs, not every retry of the same failed integration.
+    failures_by_job = {}
+    for run in failed_runs:
+        failures_by_job.setdefault(run["job"], run)
+    failures = list(failures_by_job.values())
     items = _inbox()
     stats = _stats()
     spend = _spend(1)
@@ -257,7 +265,8 @@ async def morning_briefing() -> dict:
     sections.extend(_plugin_sections("briefing"))
     sections.append({
         "heading": "At a glance",
-        "rows": [("jobs completed", len(runs) - len(failures)),
+        "rows": [("successful runs", sum(bool(r.get("ok")) and r.get("status") != "deferred" for r in runs)),
+                 ("deferred runs", sum(r.get("status") == "deferred" for r in runs)),
                  ("knowledge items", stats.get("knowledge", 0)),
                  ("cloud spend", _money(spend["cost_usd"]))],
     })
@@ -301,7 +310,7 @@ def _briefing_subject(waiting: int, failures: int) -> str:
 async def weekly_letter() -> dict:
     """Weekly: the longer account — what grew, what was curated, what it cost."""
     runs = _runs_since(24 * 7)
-    ok = [r for r in runs if r.get("ok")]
+    ok = [r for r in runs if r.get("ok") and r.get("status") != "deferred"]
     failures = [r for r in runs if not r.get("ok")]
     items = _inbox()
     stats = _stats()
@@ -377,6 +386,11 @@ async def watch_alerts() -> dict:
     c = store.conn()
     try:
         for job in scheduler.jobs():
+            # A mailer cannot report its own delivery problem over the same
+            # failing channel. Keep those failures visible in its outbox/UI.
+            if job.agent == "herald":
+                store.clear_alert(c, f"job_failed:{job.name}")
+                continue
             history = scheduler.history(job.name)
             if not history:
                 continue

@@ -190,7 +190,9 @@ async def deliver(kind: str, subject: str, html: str, text: str,
         if not allowed:
             mid = store.queue(c, kind, to_addr, subject, html, text, status="queued", reason=why)
             log.info("herald not sending %s now (%s)", kind, why)
-            return {"ok": False, "outcome": "queued", "id": mid, "reason": why}
+            deferred = why == "quiet hours" or why.startswith("daily cap reached (")
+            return {"ok": deferred, "outcome": "queued", "id": mid,
+                    "reason": why, "deferred": deferred}
 
         mid = store.queue(c, kind, to_addr, subject, html, text)
     finally:

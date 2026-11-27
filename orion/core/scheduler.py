@@ -29,10 +29,24 @@ _RUNS_FILE = config.root() / "data" / "job_runs.json"
 _HISTORY_KEEP = 20   # runs kept per job in the persisted log
 
 
+def result_deferred(result: object) -> bool:
+    """Policy deferrals are neither delivery failures nor completed deliveries.
+
+    Recognize old Herald rows as well as the explicit new contract so a restart
+    cannot resurrect false alerts from the persisted history.
+    """
+    if not isinstance(result, dict):
+        return False
+    reason = str(result.get("reason") or "")
+    return (result.get("deferred") is True or
+            (result.get("outcome") == "queued" and
+             (reason == "quiet hours" or reason.startswith("daily cap reached ("))))
+
+
 def result_failed(result: object) -> bool:
     """A returned failure is still a failure, including composite plugin jobs."""
     if isinstance(result, dict):
-        return (result.get("ok") is False or bool(result.get("error"))
+        return ((result.get("ok") is False and not result_deferred(result)) or bool(result.get("error"))
                 or any(result_failed(value) for value in result.values()
                        if isinstance(value, (dict, list))))
     if isinstance(result, list):
@@ -118,7 +132,10 @@ class Scheduler:
                             result = ast.literal_eval(run.get("result", ""))
                         except (ValueError, SyntaxError, TypeError):
                             continue
-                        if result_failed(result):
+                        if result_deferred(result):
+                            run["ok"] = True
+                            run["status"] = "deferred"
+                        elif result_failed(result):
                             run["ok"] = False
             except Exception:
                 self._history = {}
@@ -130,6 +147,7 @@ class Scheduler:
         runs.insert(0, {
             "at": datetime.now().isoformat(timespec="seconds"),
             "ok": ok,
+            "status": "deferred" if result_deferred(result) else "success" if ok else "failed",
             "seconds": round(seconds, 1),
             "result": str(result)[:400],
         })

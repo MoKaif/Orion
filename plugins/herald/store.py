@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 
 _BUSY_TIMEOUT_MS = 30_000
 _READY = False
+_AUTOMATIC_KINDS = ("alert", "briefing", "weekly", "nudge")
 
 
 def now() -> str:
@@ -66,13 +67,45 @@ def conn() -> sqlite3.Connection:
     c.execute("PRAGMA synchronous = NORMAL")
     if not _READY:
         c.executescript(_SCHEMA)
+        compact_queue(c)
         _READY = True
     return c
 
 
 # -- outbox ----------------------------------------------------------------
+def compact_queue(c: sqlite3.Connection) -> int:
+    """Cancel obsolete automatic mail, preserving every body in the audit history.
+
+    Only automatic queued summaries are affected. Held approvals, manual messages,
+    sent mail and real transport failures are never compacted.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+    kinds = ",".join("?" for _ in _AUTOMATIC_KINDS)
+    expired = c.execute(
+        f"UPDATE outbox SET status='cancelled', reason='expired automatic message (24h)' "
+        f"WHERE status='queued' AND kind IN ({kinds}) AND created_at < ?",
+        (*_AUTOMATIC_KINDS, cutoff)).rowcount
+    duplicates = c.execute(
+        f"UPDATE outbox SET status='cancelled', reason='superseded by newer automatic message' "
+        f"WHERE status='queued' AND kind IN ({kinds}) AND id NOT IN "
+        "(SELECT MAX(id) FROM outbox WHERE status='queued' GROUP BY kind,to_addr)",
+        _AUTOMATIC_KINDS).rowcount
+    c.commit()
+    return expired + duplicates
+
+
 def queue(c: sqlite3.Connection, kind: str, to_addr: str, subject: str,
           html: str, text: str, status: str = "queued", reason: str | None = None) -> int:
+    if status == "queued" and kind in _AUTOMATIC_KINDS:
+        compact_queue(c)
+        existing = c.execute(
+            "SELECT id FROM outbox WHERE status='queued' AND kind=? AND to_addr=? "
+            "ORDER BY id DESC LIMIT 1", (kind, to_addr)).fetchone()
+        if existing:
+            c.execute("UPDATE outbox SET subject=?,html=?,text=?,reason=? WHERE id=?",
+                      (subject, html, text, reason, existing[0]))
+            c.commit()
+            return existing[0]
     cur = c.execute(
         "INSERT INTO outbox (kind, to_addr, subject, html, text, status, reason, created_at) "
         "VALUES (?,?,?,?,?,?,?,?)",

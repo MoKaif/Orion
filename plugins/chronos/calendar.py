@@ -129,7 +129,7 @@ def create_event(proposal: dict[str, Any]) -> dict[str, Any]:
     return {"id": event.get("id"), "html_link": event.get("htmlLink")}
 
 
-def authorize() -> Path:
+def authorize(*, port: int = 0) -> Path:
     """Interactive host-side flow used by scripts/authorize_chronos.py."""
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -139,7 +139,8 @@ def authorize() -> Path:
     if client is None:
         raise RuntimeError("No client_secret_*.json found in config/")
     flow = InstalledAppFlow.from_client_secrets_file(str(client), SCOPES)
-    creds = flow.run_local_server(port=0, open_browser=False,
+    creds = flow.run_local_server(port=port, bind_addr="127.0.0.1", open_browser=False,
+                                  timeout_seconds=600, prompt="consent", access_type="offline",
                                   authorization_prompt_message="Open this URL to authorize Chronos:\n{url}")
     path = token_file()
     path.write_text(creds.to_json())
