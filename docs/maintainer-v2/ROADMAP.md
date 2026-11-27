@@ -144,3 +144,19 @@ SQLite integrity. Test frontend interaction with component/E2E infrastructure wh
 currently TypeScript/Vite and live page/API checks exist, not a frontend component test suite.
 Provider tests use mocks unless explicitly running an integration check. Record actual commands
 and outcomes; never infer a successful build from installed tooling or a model response.
+
+## Host validation record — 2026-11-27
+
+The initial import registered and observed 21 workspace projects. Guardian snapshot
+`20261127T133428Z` preceded the migration. SQLite integrity passed; seven legacy runs were
+reassessed while preserving their original reported status. The idle legacy runner unit was
+disabled. Orion was rebuilt/restarted; `/health` exposes the loaded commit and clean-start
+state, the project API returns 21 records with execution disabled, and Caddy serves
+`http://orion.home.arpa/maintainer`. A headless Firefox capture verified the populated page
+against the live API. Verification: 97 Python tests, TypeScript/Vite production build, and
+live smoke checks (six pass, one optional unconfigured Gemini warning, zero failures).
+
+To inspect: open the workspace, select a project for Git/version/environment evidence, then
+use Attention, Releases, Proposals or Executions. Inspect projects reads local state; Verify
+remotes checks branch tips; Discover projects onboards new Git roots only beneath the configured
+workspace. Development changes are recorded as unreleased; no release tag was created.

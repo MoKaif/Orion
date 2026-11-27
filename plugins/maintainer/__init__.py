@@ -455,6 +455,8 @@ async def post_result(run_id: int, body: RunResult, authorization: str | None = 
         fields = body.model_dump()
         fields.pop("ok", None)
         ok = store.successful_result(body.ok, fields)
+        if body.ok and not ok:
+            fields["error"] = fields.get("error") or "Runner reported success without passing required verification"
         store.finish_run(c, run_id, ok, fields)
         store.set_status(c, run["task_id"], "done" if ok else "failed",
                          finished_at=store.now())

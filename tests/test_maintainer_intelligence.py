@@ -215,6 +215,7 @@ class ProjectTests(unittest.TestCase):
                     json={"ok": True, "verify": verdict, "files_changed": 2})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(store.get_run(c, run_id)["status"], "failed")
+            self.assertIn("verification", store.get_run(c, run_id)["error"])
             self.assertEqual(store.get_task(c, task_id)["status"], "failed")
         c.close()
 

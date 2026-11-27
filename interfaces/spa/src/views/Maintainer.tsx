@@ -23,7 +23,7 @@ function signals(project: Project): { text: string; tone: string }[] {
     else if (["uncommitted_changes", "unpushed_commits", "cached_remote_updates", "no_tracking_branch", "missing_origin", "detached_head"].includes(state))
       result.push({ text: label(state), tone: "warn" });
   }
-  if (remote.state === "tracking_ref_changed") result.push({ text: "Origin changed since last fetch", tone: "warn" });
+  if (remote.state === "tracking_ref_changed") result.push({ text: "Remote and tracking tips differ", tone: "warn" });
   if (["unavailable", "stale", "tracking_branch_missing"].includes(remote.state))
     result.push({ text: `Remote ${label(remote.state)}`, tone: "warn" });
   for (const [stack, tool] of [[".NET", "dotnet"], ["Go", "go"], ["C++ / CMake", "cmake"]]) {
