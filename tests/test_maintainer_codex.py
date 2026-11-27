@@ -92,7 +92,8 @@ class NightlyAuditTests(unittest.IsolatedAsyncioTestCase):
                     "risk": "low",
                 }
                 repo = {"name": "Example", "root": "/repo", "base": "main"}
-                with (patch.object(scan.repos, "all_repos", return_value=[repo]),
+                with (patch.object(scan.repos, "scan_cfg", return_value={}),
+                      patch.object(scan.repos, "all_repos", return_value=[repo]),
                       patch.object(scan.repos, "head_sha", return_value="same-sha"),
                       patch.object(scan.repos, "digest", return_value={"repo": "Example"})
                       as digest,

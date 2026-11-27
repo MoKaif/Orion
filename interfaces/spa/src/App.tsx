@@ -6,6 +6,7 @@ import Agents from "./views/Agents";
 import AgentDetail from "./views/AgentDetail";
 import Chat from "./views/Chat";
 import Sessions from "./views/Sessions";
+import Maintainer from "./views/Maintainer";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/chat/:sessionId" element={<Chat />} />
         <Route path="/sessions" element={<Sessions />} />
+        <Route path="/maintainer" element={<Maintainer />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

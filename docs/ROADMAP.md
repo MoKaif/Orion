@@ -157,7 +157,11 @@ reference implementation.
       One core addition (`orion/core/reports.py` + `plugin_sdk.add_report_source`) lets a plugin
       contribute sections, facts and alerts to another agent's letters, which is how Herald
       reports Maintainer's nights without knowing Maintainer exists.
-      Next: chat-initiated tasks, Orion self-improvement (one config flag), PR-comment iteration.
+      **Superseded by the native deployment and Maintainer 2.0:** legacy execution is paused;
+      registry, deterministic Git/version observations, environment inventory and `/maintainer`
+      are implemented. Revision-bound proposals/approvals, isolated execution and recovery remain
+      pending. Follow the [phased roadmap](maintainer-v2/ROADMAP.md); the historical container
+      description above is not the current execution security boundary.
 - [x] **Cloud orchestrator hardening** — prompt caching (cacheable stable system prefix,
       separated from the volatile per-turn world-model context), per-model **$** cost tracking
       (cache-aware pricing table; `usage.json` records tokens + dollars split by model; the

@@ -1,4 +1,8 @@
-"""Maintainer — the agent that writes code, and the first that changes something outside Orion.
+"""Maintainer: native engineering intelligence plus preserved legacy execution history.
+
+Current behavior: read-only local/remote collectors and persistent project configuration.
+Legacy execution is closed pending revision-bound approvals and isolated verification.
+The description below records the v1 topology; it is not the native service's security model.
 
 The other three agents work inside the house: the Conductor keeps the world model in order, the
 Curator edits the vault, Herald carries news out to your inbox. Maintainer touches the projects
@@ -24,13 +28,16 @@ read-only view of your code.
 from __future__ import annotations
 
 import json
+import hmac
 import os
+import sqlite3
 import time
 from html import escape
 from typing import Any
+from typing import Literal
 
-from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from orion.core import plugin_sdk as orion
 
@@ -46,11 +53,10 @@ def register() -> None:
 
     orion.add_agent(
         "maintainer", "Maintainer",
-        tagline="Code",
-        blurb="Reads your projects overnight and proposes work worth doing. When you approve a "
-              "brief, it hands the job to Codex on your own machine, in a throwaway "
-              "worktree, and opens a pull request for you to review. It never merges, never "
-              "pushes to main, and never touches the checkout you are working in.",
+        tagline="Engineering",
+        blurb="Tracks project configuration, Git synchronization, versions and development "
+              "toolchains. Open Maintainer in the sidebar for the project workspace. "
+              "Automatic development is paused while revision-bound approvals are built.",
         icon="git-pull-request", accent="idea", plugin="maintainer", order=40,
         summary=_summary, detail=_detail)
 
@@ -59,6 +65,13 @@ def register() -> None:
                   description="Audits every enabled repo under a rotating maintenance focus, "
                               "even when no commits changed. Nothing runs until you approve it.",
                   limit_default=6)
+    from . import intelligence
+    orion.add_job("maintainer_observe", "*/10 * * * *", intelligence.refresh, agent="maintainer",
+                  label="Inspect project health",
+                  description="Read local Git, version and environment facts without changing checkouts.")
+    orion.add_job("maintainer_remotes", "23 * * * *", intelligence.refresh_remotes,
+                  agent="maintainer", label="Verify remote branch tips",
+                  description="Read origin branch tips without fetching into your checkouts.")
     orion.add_job("maintainer_sweep", "*/15 * * * *", scan.sweep, agent="maintainer",
                   label="Check on the runner",
                   description="Marks a run failed if the host runner stops reporting, so a "
@@ -149,25 +162,14 @@ def status() -> dict[str, Any]:
     readable = repos.workspace().exists()
     git_ok = _git_reachable(configured)
 
-    if not os.environ.get(_TOKEN_ENV):
-        state, reason = "no token", (
-            f"no {_TOKEN_ENV} in config/secrets.json, so no runner can claim work. Add one and "
-            "start the host runner.")
-    elif not readable:
-        state, reason = "no workspace", (
-            f"{repos.workspace()} is not readable from here — check the read-only mount in "
-            "docker-compose.yml.")
+    state, reason = "monitoring", ("Automatic development is paused pending revision-bound "
+                                   "approvals and isolated verification. Project monitoring is available.")
+    if not readable:
+        state, reason = "no workspace", "The configured development workspace is unavailable."
     elif not git_ok:
-        state, reason = "no git", (
-            "git cannot read your repos at their base branch, so the nightly scan has nothing "
-            "to look at.")
-    elif seen is None:
-        state, reason = "waiting", (
-            "the host runner has never checked in. Start orion-maintainer.service.")
-    else:
-        state, reason = "ready", ""
-
-    return {"state": state, "reason": reason, "ok": state == "ready",
+        state, reason = "no git", "Legacy scan references are unavailable; inspect projects for local status."
+    return {"state": state, "reason": reason, "ok": readable and git_ok,
+            "execution_enabled": False,
             "runner_seen": (seen or {}).get("at"), "runner": (seen or {}).get("value"),
             "repos": configured, "workspace": str(repos.workspace()),
             "open_prs": counts.get("open_prs", 0), "waiting": counts.get("proposed", 0)}
@@ -197,15 +199,13 @@ def _inbox_items() -> list[dict[str, Any]]:
             "origin": "maintainer", "id": t["id"],
             "title": f"Work on “{t['title']}” in {t['repo']}",
             "body": body[:1600],
-            "effect": (f"Hands this to Codex on your machine, in a throwaway worktree "
-                       f"branched from {t['repo']}'s base branch, and opens a pull request for "
-                       f"you to review. Your own checkout is not touched, and nothing merges."),
+            "effect": "Legacy proposal preserved for review. Automatic execution is paused "
+                      "until evidence-backed, revision-bound approvals are available.",
             "created_at": t.get("created_at") or "",
             "prov_agent": "Maintainer",
             "prov_label": t["rationale"] or f"proposed for {t['repo']}",
             "action_url": f"/plugins/maintainer/tasks/{t['id']}",
             "actions": [
-                orion.inbox_action("Let it work", "approve", "accept"),
                 orion.inbox_action("Not now", "reject", "reject"),
             ],
         })
@@ -258,9 +258,10 @@ async def resolve_task(tid: int, body: TaskAction):
         if task["status"] != "proposed":
             return {"ok": False, "reason": f"this task is already {task['status']}"}
         if body.action in ("approve", "accept", "apply"):
-            store.approve(c, tid)
-            return {"ok": True, "status": "approved",
-                    "message": f"Queued. The runner will start on “{task['title']}” shortly."}
+            raise HTTPException(409, "Execution is paused until revision-bound approvals and "
+                                "isolated verification are available. The proposal is preserved.")
+        if body.action not in ("reject", "dismiss"):
+            raise HTTPException(422, "Expected approve or reject")
         store.set_status(c, tid, "rejected", finished_at=store.now())
         return {"ok": True, "status": "rejected", "message": "Dropped. It will not come back."}
     finally:
@@ -305,6 +306,63 @@ async def list_repos():
     return repos.all_repos(enabled_only=False)
 
 
+@router.get("/projects")
+async def list_projects():
+    from . import intelligence
+    return intelligence.summary()
+
+
+class RefreshRequest(BaseModel):
+    discover: bool = False
+    remote: bool = False
+
+
+@router.post("/projects/refresh", status_code=202)
+async def refresh_projects(body: RefreshRequest, background_tasks: BackgroundTasks):
+    from . import intelligence
+    background_tasks.add_task(intelligence.refresh, discovery=body.discover, remote=body.remote)
+    return {"accepted": True, "message": "Inspection requested; results appear as projects are observed"}
+
+
+class ReleasePolicy(BaseModel):
+    model_config = {"extra": "forbid"}
+    versioning: Literal["semantic", "calendar", "unversioned"] = "semantic"
+    version_path: str = Field(default="package.json", max_length=256)
+    tag_prefix: str = Field(default="v", max_length=32)
+    release_branch: str = Field(default="main", min_length=1, max_length=200)
+
+
+class ProjectSettings(BaseModel):
+    model_config = {"extra": "forbid"}
+    description: str | None = Field(default=None, max_length=1000)
+    release: ReleasePolicy | None = None
+
+
+class ProjectUpdate(BaseModel):
+    model_config = {"extra": "forbid"}
+    revision: int = Field(ge=1)
+    status: Literal["active", "paused", "archived"] | None = None
+    path: str | None = Field(default=None, max_length=1000)
+    settings: ProjectSettings | None = None
+
+
+@router.patch("/projects/{project_id}")
+async def update_project(project_id: str, body: ProjectUpdate):
+    from . import registry
+    c = registry.conn()
+    try:
+        changes = body.model_dump(exclude_none=True, exclude={"revision"})
+        return registry.update(c, project_id, body.revision, changes)
+    except KeyError:
+        raise HTTPException(404, "Project not found")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "That checkout is already registered")
+    finally:
+        c.close()
+
+
 # -- the runner protocol ---------------------------------------------------
 # Everything below is spoken only by scripts/maintainer_runner.py on the host. It is guarded by
 # a shared token because these endpoints hand out work that will run a coding agent against
@@ -343,7 +401,7 @@ def _authorize(authorization: str | None) -> None:
     expected = os.environ.get(_TOKEN_ENV)
     if not expected:
         raise HTTPException(503, f"no {_TOKEN_ENV} configured; the runner protocol is closed")
-    if authorization != f"Bearer {expected}":
+    if not hmac.compare_digest(authorization or "", f"Bearer {expected}"):
         raise HTTPException(401, "bad runner token")
 
 
@@ -366,30 +424,10 @@ async def claim(body: ClaimRequest, authorization: str | None = Header(None)):
     _authorize(authorization)
     _seen(body.runner)
 
-    from . import repos, store
-    c = store.conn()
-    try:
-        task = store.claim_next(c, body.runner)
-        if task is None:
-            return {"task": None}
-        repo = repos.get(task["repo"])
-        if repo is None:
-            store.set_status(c, task["id"], "failed", finished_at=store.now())
-            return {"task": None, "note": f"repo '{task['repo']}' is no longer configured"}
-        run_id = store.start_run(c, task["id"], branch=f"maintainer/{task['slug']}-{task['id']}")
-        store.set_status(c, task["id"], "running")
-        return {
-            "task": {**task, "files": json.loads(task["files"] or "[]")},
-            "repo": repo,
-            "run_id": run_id,
-            "branch": f"maintainer/{task['slug']}-{task['id']}",
-            "codex": repos.settings().get("codex") or {},
-            "runner": repos.settings().get("runner") or {},
-            "worktrees": repos.settings().get("worktrees"),
-        }
-    finally:
-        c.close()
-
+    # The legacy protocol carries neither a revision-bound approval nor scoped permissions.
+    # Old approvals remain in the database for review; never reinterpret them as v2 grants.
+    return {"task": None, "paused": True,
+            "reason": "Legacy execution disabled; awaiting revision-bound v2 approvals"}
 
 @router.post("/runner/runs/{run_id}/events")
 async def post_events(run_id: int, body: EventBatch, authorization: str | None = Header(None)):
@@ -416,8 +454,9 @@ async def post_result(run_id: int, body: RunResult, authorization: str | None = 
             return {"ok": False, "reason": f"no run {run_id}"}
         fields = body.model_dump()
         fields.pop("ok", None)
-        store.finish_run(c, run_id, body.ok, fields)
-        store.set_status(c, run["task_id"], "done" if body.ok else "failed",
+        ok = store.successful_result(body.ok, fields)
+        store.finish_run(c, run_id, ok, fields)
+        store.set_status(c, run["task_id"], "done" if ok else "failed",
                          finished_at=store.now())
         return {"ok": True}
     finally:

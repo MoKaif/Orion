@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Cut an Orion release: bump the version, write the changelog, commit, tag, push.
+"""Prepare Orion release metadata. Commit, tag and push require explicit flags.
 
-Every user-requested change ships through this script, so the version in
-`orion/__init__.py`, the `CHANGELOG.md` entry, the git tag, and `origin/main` can
-never drift apart. See docs/VERSIONING.md.
+Normal development commits do not require a release. See docs/VERSIONING.md.
 
     python scripts/release.py patch -m "Fix vault ingestion on empty notes"
     python scripts/release.py minor -m "Add finance plugin" \\
@@ -145,7 +143,7 @@ def commit_message(version: str, headline: str, sections: dict[str, list[str]],
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Bump the version, update the changelog, commit, tag, and push.",
+        description="Prepare version/changelog changes; publication is explicit.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -163,22 +161,44 @@ def main() -> int:
     parser.add_argument("-r", "--removed", action="append", default=[], metavar="NOTE")
     parser.add_argument("--trailer", action="append", default=[], metavar="LINE",
                        help="extra commit trailer, e.g. Co-Authored-By: ... (repeatable)")
-    parser.add_argument("--no-push", action="store_true", help="commit and tag but do not push")
+    parser.add_argument("--prepare-only", action="store_true", help="prepare metadata only (the default)")
+    parser.add_argument("--unreleased", action="store_true",
+                       help="record development notes without changing the version")
+    parser.add_argument("--commit", action="store_true", help="commit only the prepared metadata")
+    parser.add_argument("--tag", action="store_true", help="create a local release tag (requires --commit)")
+    parser.add_argument("--push", action="store_true", help="push main and this tag atomically (requires --tag)")
+    parser.add_argument("--no-push", action="store_true", help="compatibility flag; never publishes")
     parser.add_argument("--allow-empty", action="store_true",
                        help="release even when only the version/changelog changed")
     parser.add_argument("--dry-run", action="store_true", help="print what would happen")
     args = parser.parse_args()
 
-    push = not args.no_push
+    if args.push and (not args.tag or not args.commit or args.no_push):
+        raise ReleaseError("--push requires --commit --tag and cannot accompany --no-push")
+    if args.tag and (not args.commit or args.unreleased):
+        raise ReleaseError("--tag requires --commit and cannot tag unreleased notes")
+    if args.prepare_only and (args.commit or args.tag or args.push):
+        raise ReleaseError("--prepare-only cannot accompany commit, tag or push")
+    push = args.push
     ensure_repo_ready(push)
 
     current = read_version()
-    version = args.explicit or next_version(current, args.part)
-    if not SEMVER_RE.fullmatch(version):
+    version = "Unreleased" if args.unreleased else args.explicit or next_version(current, args.part)
+    if not args.unreleased and not SEMVER_RE.fullmatch(version):
         raise ReleaseError(f"{version!r} is not a bare MAJOR.MINOR.PATCH version")
     tag = f"v{version}"
-    if tag in git("tag", "--list", tag).split():
+    if not args.unreleased and tag in git("tag", "--list", tag).split():
         raise ReleaseError(f"tag {tag} already exists")
+    if not args.unreleased and tuple(map(int, version.split("."))) <= tuple(map(int, current.split("."))):
+        raise ReleaseError("new version must be greater than the current version")
+    if MARKER not in CHANGELOG.read_text(encoding="utf-8"):
+        raise ReleaseError(f"{CHANGELOG.name} is missing its {MARKER} insertion marker")
+    if args.commit:
+        changed = git("diff", "--name-only", "HEAD", "--", ".", ":(exclude)orion/__init__.py",
+                      ":(exclude)CHANGELOG.md")
+        untracked = git("ls-files", "--others", "--exclude-standard")
+        if changed or untracked:
+            raise ReleaseError("commit implementation changes first; --commit includes release metadata only")
     if not has_changes() and not args.allow_empty:
         raise ReleaseError("working tree is clean — nothing to release (use --allow-empty)")
 
@@ -187,22 +207,25 @@ def main() -> int:
     message = commit_message(version, args.message, sections, args.trailer)
 
     if args.dry_run:
-        print(f"{current} -> {version}  (tag {tag}, push={push})\n")
+        print(f"{current} -> {version}  (commit={args.commit}, tag={args.tag}, push={push})\n")
         print(entry)
         print("--- commit message ---")
         print(message)
         return 0
 
-    write_version(version)
+    if not args.unreleased:
+        write_version(version)
     write_changelog(entry)
-    git("add", "-A")
-    git("commit", "-m", message)
-    git("tag", "-a", tag, "-m", f"{tag} — {args.message}")
+    if args.commit:
+        git("add", "--", "orion/__init__.py", "CHANGELOG.md")
+        git("commit", "--only", "orion/__init__.py", "CHANGELOG.md", "-m", message)
+    if args.tag:
+        git("tag", "-a", tag, "-m", f"{tag} — {args.message}")
     if push:
-        git("push", REMOTE, BRANCH, "--follow-tags")
+        git("push", "--atomic", REMOTE, BRANCH, f"refs/tags/{tag}")
         print(f"released {tag} → {REMOTE}/{BRANCH}")
     else:
-        print(f"committed and tagged {tag} (not pushed)")
+        print(f"prepared {version} (commit={args.commit}, tag={args.tag}; nothing pushed)")
     return 0
 
 

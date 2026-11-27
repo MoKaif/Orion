@@ -27,16 +27,20 @@ architecture source of truth. Read `docs/VERSIONING.md` before preparing a relea
 
 ## Maintainer
 
-Maintainer audits every enabled repository nightly in Orion's read-only workspace view, even
-when its base branch has not changed. It rotates focus and samples bounded source excerpts in
-addition to project notes, commits, and TODOs. After user approval, the
-host-side `scripts/maintainer_runner.py` invokes `codex exec` in a dedicated worktree, verifies
-the result, pushes only a `maintainer/*` branch, and opens a pull request. It never merges and
-must never write in a user's normal checkout. Codex uses the host's saved CLI authentication;
-provider API keys are deliberately removed from its child environment.
-Dependency installation must complete successfully before Codex starts. Verification is chosen
-from the paths actually changed; unavailable host toolchains are reported as blocked rather than
-as code failures.
+Read `docs/maintainer-v2/DESIGN.md` and `ROADMAP.md` before changing Maintainer. The native
+service provides persistent project configuration, read-only Git observations, remote tip
+verification, version metadata and fixed toolchain inventory. Its SPA workspace is `/maintainer`.
+Native deployment is not an OS-enforced read-only Docker mount.
+
+Legacy candidate generation is paused by configuration; legacy execution/approval endpoints
+fail closed. Preserve tasks, approvals, runs and events without treating them as v2 grants.
+Do not re-enable execution until revision-bound scopes, owner authentication, isolated
+verification, durable jobs and recovery exist. Never mutate normal checkouts. Failed,
+unavailable or missing required verification cannot become success or publication. Scrubbing
+environment variables does not isolate build scripts from host credentials.
+
+Release versions are milestones, not per-commit counters. Follow `docs/VERSIONING.md`; the
+release script prepares metadata by default and `--unreleased` records work without a bump.
 
 ## Curator
 

@@ -10,6 +10,19 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [Unreleased] — 2026-11-27
+
+Add Maintainer engineering intelligence foundation
+
+### Added
+- Persistent registry for workspace projects, read-only Git and remote-tip monitoring, version metadata, environment inventory and a dedicated engineering dashboard.
+
+### Changed
+- Pause legacy approvals and execution pending scoped approvals and isolation; prepare releases explicitly and expose build commit identity.
+
+### Fixed
+- Stop publication after failed or unavailable verification and preserve historical runner reports while reassessing outcomes.
+
 ## [0.15.0] — 2026-10-02
 
 Add Chronos calendar intelligence

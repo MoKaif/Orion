@@ -4,7 +4,14 @@ Codex and other coding agents should read `AGENTS.md` first. This older operatio
 remains for tools that still discover `CLAUDE.md`; the three docs in `docs/` are the source of
 truth.
 
-## Versioning — non-negotiable
+## Versioning — current policy
+
+The approved policy in `docs/VERSIONING.md` supersedes the historical procedure below:
+normal commits do not require releases. `scripts/release.py` prepares metadata by default,
+`--unreleased` records notes without a bump, and commit/tag/push require explicit flags.
+`/health.build` reports loaded Git identity separately. Never hand-edit version/changelog.
+
+### Historical release procedure (superseded; do not execute)
 
 **Every user-requested change ends with a release.** Repo: `git@github.com:MoKaif/Orion.git`
 (`origin/main`). After making and verifying the change, cut it with:
@@ -265,6 +272,13 @@ never a drip). Own store: `data/herald.db` (WAL + 30 s busy_timeout like the Cur
   Tables, not flexbox; inline styles only; `multipart/alternative` with a real text part.
 
 ## Maintainer plugin (v1 done) — the first agent that changes code outside Orion
+
+**Current state supersedes this historical v1 description:** see
+`docs/maintainer-v2/DESIGN.md` and `ROADMAP.md`. Orion is native, with read-only collectors
+rather than an enforced container mount. `/maintainer` is the project workspace. Legacy
+claims/approvals and shipped legacy proposal generation are paused. Automatic development
+must stay closed until revision-bound scopes, owner authentication, durable jobs, isolated
+verification and recovery are implemented. Environment scrubbing is not a sandbox.
 
 `plugins/maintainer/` — reads your projects overnight, proposes work, and (once you approve the
 brief) hands the job to **Codex on the host**, which opens a pull request you review on

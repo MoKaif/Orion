@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI):
     log.info("Orion %s starting for user=%s | clock=%s (%s)", __version__, identity.user(),
              tz or "system default", _dt.now().strftime("%Y-%m-%d %H:%M %Z"))
     from orion.core.tools.builtin import register_builtins
+    from orion.core.build import identity as build_identity
+    build_identity()
     from orion.core.tools import selection
     from orion.core import maintenance
     register_builtins()                       # always-available core tools
@@ -82,9 +84,11 @@ templates = _templates()
 
 @app.get("/health")
 async def health():
+    from orion.core.build import identity as build_identity
     return {
         "status": "ok",
         "version": __version__,
+        "build": build_identity(),
         "user": identity.user(),
         "constitution_loaded": bool(constitution.text()),
         "plugins": [p.name for p in plugins.discover()],

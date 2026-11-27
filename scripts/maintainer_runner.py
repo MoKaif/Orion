@@ -132,10 +132,13 @@ def assert_safe(worktree: Path, repo_root: Path, job: dict[str, Any]) -> None:
     checked to be inside Maintainer's own directory and outside the user's checkout before a
     single file is touched. A misconfiguration should stop the run, not eat a working tree.
     """
+    worktree = worktree.resolve()
     root = Path(job.get("worktrees") or "~/.local/share/orion-maintainer").expanduser().resolve()
     if not str(worktree).startswith(str(root) + os.sep):
         raise RuntimeError(f"refusing to work in {worktree}: outside {root}")
-    if worktree == repo_root or str(repo_root).startswith(str(worktree) + os.sep):
+    repo_root = repo_root.resolve()
+    if (worktree == repo_root or repo_root in worktree.parents
+            or worktree in repo_root.parents):
         raise RuntimeError(f"refusing to work in {worktree}: that is the real checkout")
 
 
@@ -190,7 +193,7 @@ def install_if_needed(job: dict[str, Any], wt: Path, feed: Feed) -> None:
         return
     minutes = float((job.get("runner") or {}).get("install_minutes", 20) or 20)
     feed.add("step", f"installing dependencies: {cmd}")
-    code, out = run(cmd, wt, timeout=int(minutes * 60))
+    code, out = run(cmd, wt, timeout=int(minutes * 60), env=child_env())
     if code != 0:
         raise RuntimeError(f"dependency install failed: {out.strip()[-400:]}")
     stamp.parent.mkdir(parents=True, exist_ok=True)
@@ -427,7 +430,7 @@ def verify(job: dict[str, Any], wt: Path, feed: Feed,
     tails = []
     for cmd in commands:
         feed.add("step", f"verifying: {cmd}")
-        code, out = run(cmd, wt, timeout=int(minutes * 60))
+        code, out = run(cmd, wt, timeout=int(minutes * 60), env=child_env())
         tail = out.strip()[-1500:]
         tails.append(f"$ {cmd}\n{tail}")
         if code != 0:
@@ -444,6 +447,13 @@ def verify(job: dict[str, Any], wt: Path, feed: Feed,
 def publish(job: dict[str, Any], wt: Path, feed: Feed, summary: str,
             verdict: str, tail: str) -> dict[str, Any]:
     """Commit, push the branch, open the pull request. The only outward-facing step."""
+    if verdict != "passed":
+        raise RuntimeError(f"publication blocked: verification is {verdict}")
+    permissions = (job.get("approval") or {}).get("permissions", [])
+    if not {"push_branch", "create_pr"}.issubset(permissions):
+        raise RuntimeError("publication requires explicit branch-push and PR approval")
+    if not shutil.which("gh"):
+        raise RuntimeError("publication blocked: gh is unavailable")
     task, repo, branch = job["task"], job["repo"], job["branch"]
     if not branch.startswith(_BRANCH_PREFIX):
         raise RuntimeError(f"refusing to push '{branch}': not a {_BRANCH_PREFIX}* branch")
@@ -488,7 +498,9 @@ def publish(job: dict[str, Any], wt: Path, feed: Feed, summary: str,
     else:
         feed.add("error", "gh is not installed, so the branch is pushed but no PR was opened")
 
-    return {"commit_sha": sha.strip()[:12], "pr_url": pr_url,
+    if not pr_url:
+        raise RuntimeError(f"branch {branch} was pushed, but PR creation failed; reconcile before retry")
+    return {"commit_sha": sha.strip(), "pr_url": pr_url,
             "pr_state": "open" if pr_url else None}
 
 
@@ -531,6 +543,10 @@ def handle(job: dict[str, Any]) -> None:
         paths = changed_paths(wt)
         verdict, tail = verify(job, wt, feed, paths)
         outcome.update({"verify": verdict, "verify_tail": tail})
+        if verdict != "passed":
+            outcome["error"] = f"Publication stopped: verification {verdict}. Worktree retained."
+            feed.add("error", outcome["error"])
+            return
         outcome.update(publish(job, wt, feed, outcome["summary"], verdict, tail))
         outcome["ok"] = True
     except Exception as e:                     # a failed task must never stop the runner

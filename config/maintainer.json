@@ -1,8 +1,8 @@
 {
-  "//": "Maintainer — the agent that proposes code changes and opens pull requests you review.",
-  "//2": "Paths are identical inside the container and on the host: the workspace is bind-mounted",
-  "//3": "READ-ONLY at the same path, so Orion can scan a repo but is incapable of writing to one.",
-  "//4": "Only scripts/maintainer_runner.py (on the host) ever writes, and only inside `worktrees`.",
+  "//": "Maintainer — persistent engineering intelligence in the native Orion service.",
+  "//2": "Collectors use read-only commands; native deployment is NOT an OS read-only mount.",
+  "//3": "Legacy execution is disabled pending revision-bound approvals and isolated verification.",
+  "//4": "The manifest seeds persistent projects once. Subsequent owner settings live in SQLite.",
   "//5": "Machine tuning belongs in the gitignored maintainer.local.json overlay, not here.",
 
   "workspace": "/home/nox/Developing-Environment",
@@ -28,6 +28,8 @@
   },
 
   "scan": {
+    "enabled": false,
+    "//paused": "Legacy candidate generation is paused until evidence-backed proposal gates replace it.",
     "//": "The nightly audit. It may file at most three useful briefs across every repo.",
     "max_candidates_per_repo": 1,
     "max_daily_tasks": 3,
@@ -45,6 +47,7 @@
     "FinStrive": {
       "path": "FinStrive",
       "base": "main",
+      "release": {"versioning": "semantic", "version_path": "package.json", "tag_prefix": "v", "release_branch": "main"},
       "blurb": "Personal finance app: .NET API, React frontend, PostgreSQL.",
       "install": "npm --prefix frontend ci",
       "install_marker": "frontend/node_modules",
@@ -58,6 +61,7 @@
     "ArcVe": {
       "path": "ArcVe/ArcVe",
       "base": "main",
+      "release": {"versioning": "semantic", "version_path": "package.json", "tag_prefix": "v", "release_branch": "main"},
       "blurb": "Gaming documentation / library dashboard, deployed on Vercel.",
       "install": "pnpm install --frozen-lockfile",
       "install_marker": "node_modules",
@@ -67,7 +71,8 @@
     "noxctl": {
       "path": "noxctl",
       "base": "main",
-      "blurb": "Server control plane for Docker services on the LAN — it is what starts Orion.",
+      "release": {"versioning": "semantic", "version_path": "package.json", "tag_prefix": "v", "release_branch": "main"},
+      "blurb": "Server control plane for native services and Docker infrastructure on the LAN.",
       "install": "npm ci",
       "install_marker": "node_modules",
       "verify": "npm run build",
@@ -76,6 +81,7 @@
     "Perseus": {
       "path": "Perseus",
       "base": "main",
+      "release": {"versioning": "unversioned", "version_path": "", "tag_prefix": "", "release_branch": "main"},
       "blurb": "Personal health platform: Go API, React dashboard, Swift HealthKit client.",
       "install": "npm --prefix server/web ci",
       "install_marker": "server/web/node_modules",
@@ -89,6 +95,7 @@
     "purple-buccaneers": {
       "path": "purple-buccaneers",
       "base": "main",
+      "release": {"versioning": "semantic", "version_path": "package.json", "tag_prefix": "v", "release_branch": "main"},
       "blurb": "Next.js site.",
       "install": "npm ci",
       "install_marker": "node_modules",
@@ -96,14 +103,14 @@
       "enabled": true
     },
     "Orion-v2": {
-      "//": "Orion improving itself. Deliberately off for v1 — turn it on once you have watched",
-      "//2": "Maintainer work on someone else's code first. Nothing else needs to change.",
+      "//": "Monitoring enabled; legacy development execution remains paused globally.",
       "path": "Orion-v2",
       "base": "main",
+      "release": {"versioning": "semantic", "version_path": "orion/__init__.py", "tag_prefix": "v", "release_branch": "main"},
       "blurb": "Orion itself.",
       "install": "",
       "install_marker": "",
-      "verify": "python -c \"import orion\"",
+      "verify": "python -m pytest -q && python scripts/smoke_test.py",
       "enabled": true
     }
   }

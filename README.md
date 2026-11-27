@@ -25,20 +25,28 @@ default; cloud LLMs are a cost-metered fallback.
   selection, confirm-gated tool execution.
 - **M3** background lifecycle — idle-by-default scheduler, proactive review generation,
   foreground/background gate so chat preempts jobs.
-- **M4** mission control — the "Obsidian Archive" HTMX web UI: dashboard, telemetry rail, SSE
+- **M4** mission control — React/TypeScript SPA: dashboard, telemetry rail, SSE
   streaming chat surfacing mode/specialist/tool runs, sessions view, ⌘K palette, light theme.
 - **M5** plugin SDK — one stable `register()` surface covering tools, specialists, world-model
   types, jobs, dashboard widgets, and a mounted `/plugins/<name>` router, plus a scaffolder.
 - **Curator v2** — the vault's resident editor: nightly review-gated grammar, entity-registry,
   backlink, and journal→world-model passes, with backups before any write.
 
-Runs as a Docker service on `:8020`. Chat routes to DeepSeek `deepseek-v4-flash`; background
+Runs as native `orion.service` on `127.0.0.1:18020`, behind the host's Caddy/Tailscale setup.
+Chat routes to DeepSeek `deepseek-v4-flash`; background
 dispatch/compress/embed stay local on Ollama + fastembed. The on-host smoke test passes
 (`scripts/smoke_test.py`): live fastembed + sqlite-vec recall, a real Ollama turn, and a full
 end-to-end pipeline run.
 
 Next: content plugins (operations / calendar) and a Pi/voice client. Vitalist now reads Perseus
 for evidence-backed daily and weekly health insights delivered through Herald.
+
+Maintainer's engineering workspace is **`/maintainer`**: persistent projects, local Git status,
+fresh remote branch tips, component versions, toolchain inventory and preserved execution logs.
+Automatic development is paused while scoped approvals and isolated verification are rebuilt.
+See the [technical design](docs/maintainer-v2/DESIGN.md) and
+[phased roadmap](docs/maintainer-v2/ROADMAP.md). Releases are deliberate milestones;
+[build identity and release policy](docs/VERSIONING.md) replace version bumps on every push.
 
 ## Run
 

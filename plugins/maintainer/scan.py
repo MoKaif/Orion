@@ -105,6 +105,9 @@ def _norm(title: str) -> str:
 async def scan_repos() -> dict[str, Any]:
     """Scheduled nightly. Audit repositories whether or not their base branch changed."""
     cfg = repos.scan_cfg()
+    if not cfg.get("enabled", True):
+        return {"ok": True, "deferred": True,
+                "reason": "Legacy proposal generation paused pending evidence quality gates"}
     per_repo = max(1, int(cfg.get("max_candidates_per_repo", 1) or 1))
     daily_cap = max(0, int(cfg.get("max_daily_tasks", 3) or 3))
     open_cap = max(0, int(cfg.get("max_open_tasks", 3) or 3))

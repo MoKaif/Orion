@@ -128,6 +128,16 @@ def _migrate(c: sqlite3.Connection) -> None:
         "UPDATE runs SET verify='blocked' WHERE verify='failed' AND "
         "(verify_tail LIKE '%No .NET SDKs were found%' "
         "OR verify_tail LIKE '%sh: line 1: next: command not found%')")
+    columns = {row[1] for row in c.execute("PRAGMA table_info(runs)")}
+    if "reported_status" not in columns:
+        c.execute("ALTER TABLE runs ADD COLUMN reported_status TEXT")
+    # Keep what the old runner reported, but stop treating failed verification as success.
+    c.execute("UPDATE runs SET reported_status=status, status='failed' "
+              "WHERE status='done' AND verify IN ('failed','blocked') "
+              "AND reported_status IS NULL")
+    c.execute("UPDATE tasks SET status='failed' WHERE status='done' AND id IN "
+              "(SELECT r.task_id FROM runs r WHERE r.id=(SELECT MAX(last.id) FROM runs last "
+              "WHERE last.task_id=r.task_id) AND r.status='failed' AND r.reported_status='done')")
     c.commit()
 
 
@@ -269,6 +279,7 @@ def heartbeat(c: sqlite3.Connection, run_id: int) -> None:
 
 
 def finish_run(c: sqlite3.Connection, run_id: int, ok: bool, fields: dict[str, Any]) -> None:
+    ok = successful_result(ok, fields)
     allowed = ("branch", "pr_url", "pr_state", "commit_sha", "files_changed", "insertions",
                "deletions", "turns", "cost_usd", "duration_s", "verify", "verify_tail",
                "summary", "error")
@@ -277,6 +288,12 @@ def finish_run(c: sqlite3.Connection, run_id: int, ok: bool, fields: dict[str, A
     c.execute(f"UPDATE runs SET status=?, ended_at=?, heartbeat_at=?{cols} WHERE id=?",
               ("done" if ok else "failed", now(), now(), *patch.values(), run_id))
     c.commit()
+
+
+def successful_result(ok: bool, fields: dict[str, Any]) -> bool:
+    """A runner cannot turn failed, unavailable or missing verification into success."""
+    return bool(ok and (fields.get("verify") == "passed" or
+                        (fields.get("files_changed") == 0 and fields.get("verify") == "skipped")))
 
 
 def get_run(c: sqlite3.Connection, run_id: int) -> dict[str, Any] | None:

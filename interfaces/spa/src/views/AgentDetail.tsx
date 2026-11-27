@@ -419,10 +419,10 @@ export default function AgentDetail() {
         </p>
       )}
 
-      {maintainer && !maintainer.ok && (
+      {maintainer && (
         <p className="ap-blocked">
-          <CircleAlert size={14} /> {maintainer.reason} Until then Maintainer can read your
-          projects and propose work, but nothing can be built.
+          <CircleAlert size={14} /> {maintainer.reason}{" "}
+          <Link to="/maintainer">Open the engineering workspace ↗</Link>
         </p>
       )}
 
@@ -714,9 +714,9 @@ export default function AgentDetail() {
       {queue.length > 0 && (
         <>
           <h2 className="ap-section">
-            Work it wants to start <span className="count-pill alert">{queue.length}</span>
-            <Link to="/inbox" className="btn btn-sm btn-ghost ap-section-act">
-              approve in inbox <ExternalLink size={12} />
+            Preserved proposals <span className="count-pill alert">{queue.length}</span>
+            <Link to="/maintainer?tab=proposals" className="btn btn-sm btn-ghost ap-section-act">
+              review proposals <ExternalLink size={12} />
             </Link>
           </h2>
           <div className="card">

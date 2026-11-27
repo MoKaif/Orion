@@ -73,10 +73,16 @@ orion/
   (in-process, single-file — deliberately **not** a separate ChromaDB service; we can't spare
   the RAM on this box).
 - **Local models:** Ollama (`/api/chat`, native). Embeddings via `fastembed` (ONNX, CPU).
-- **Frontend:** HTMX-first + minimal vanilla JS. No React, no build step, no Electron, no Docker.
+- **Frontend:** React/TypeScript SPA built with Vite (`interfaces/spa`), React Query and existing
+  CSS tokens. Jinja/HTMX remains available at `/legacy`.
 - **Config:** layered JSON in `config/`, editable from the settings UI.
 - **Deploy:** `systemd` unit (`Restart=always`), Ollama as a separate systemd service, idle-by-
   default background jobs, log rotation. Remote access via **Tailscale** (no port-forwarding).
+
+Maintainer's evolution is documented in [Maintainer 2.0](maintainer-v2/DESIGN.md). It keeps
+engineering data in its existing SQLite database, uses deterministic read-only collectors and
+preserves legacy history. Development execution stays closed pending approval/isolation/recovery
+redesign. Project facts never silently modify the World Model. See [version policy](VERSIONING.md).
 
 ## 4. World Model data model (SQLite)
 
