@@ -29,7 +29,8 @@ architecture source of truth. Read `docs/VERSIONING.md` before preparing a relea
 
 Read `docs/maintainer-v2/DESIGN.md` and `ROADMAP.md` before changing Maintainer. The native
 service provides persistent project configuration, read-only Git observations, remote tip
-verification, version metadata and fixed toolchain inventory. Its SPA workspace is `/maintainer`.
+verification, version metadata and fixed toolchain inventory. Its SPA workspace is under
+Agents at `/agents/maintainer`; `/maintainer` redirects there, preserving section/project links.
 Native deployment is not an OS-enforced read-only Docker mount.
 
 Legacy candidate generation is paused by configuration; legacy execution/approval endpoints

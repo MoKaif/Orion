@@ -380,17 +380,20 @@ deduplication/resolution, so repeated polling does not create notification noise
 
 ## Frontend and migration
 
-The new `/maintainer` route reuses Orion tokens and Shell. Tabs: Projects, Attention, Releases,
+The workspace lives within the existing agent page at `/agents/maintainer`, reached through
+Agents → Maintainer. The old `/maintainer` route redirects there with query/hash preserved;
+there is no separate sidebar entry. It reuses Orion tokens and Shell. Tabs: Projects, Attention, Releases,
 Proposals, Executions. Project selection provides Git facts, version components, environment
 and evidence, and explicit policy/path/status editing. Preserved proposal review clearly says
 execution is paused. Execution detail exposes verification output and recorded events.
 Loading, unavailable, unknown, stale and empty states are distinct; there is no fabricated
-health score. Keep the agent page for schedules/summary, linked to the engineering workspace.
+health score. Agent status, project workspace, schedule and activity share the same page;
+a schedule anchor avoids scrolling through the project directory to reach job controls.
 
 Representative layout:
 
 ```text
-Maintainer                           Agent schedule ↗
+Agents → Maintainer                  Schedule and activity ↓
 [Inspect projects] [Verify remotes] [Discover projects]  last inspection
 Projects | Need attention | Tracking verified in sync | Missing/stale
 Projects  Attention  Releases  Proposals  Executions

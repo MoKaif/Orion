@@ -41,7 +41,8 @@ end-to-end pipeline run.
 Next: content plugins (operations / calendar) and a Pi/voice client. Vitalist now reads Perseus
 for evidence-backed daily and weekly health insights delivered through Herald.
 
-Maintainer's engineering workspace is **`/maintainer`**: persistent projects, local Git status,
+Maintainer's engineering workspace is under **Agents → Maintainer** (`/agents/maintainer`):
+persistent projects, local Git status,
 fresh remote branch tips, component versions, toolchain inventory and preserved execution logs.
 Automatic development is paused while scoped approvals and isolated verification are rebuilt.
 See the [technical design](docs/maintainer-v2/DESIGN.md) and

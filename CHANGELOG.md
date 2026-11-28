@@ -10,6 +10,13 @@ it is served at `/health` and shown in the web UI. Releases are cut with
 
 <!-- releases -->
 
+## [Unreleased] — 2026-11-28
+
+Place the Maintainer workspace inside its agent page
+
+### Fixed
+- Consolidate project intelligence, agent status, schedules and activity under Agents -> Maintainer; remove duplicate navigation and legacy panels, and preserve existing workspace bookmarks.
+
 ## [Unreleased] — 2026-11-27
 
 Add Maintainer engineering intelligence foundation

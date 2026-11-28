@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { RefreshCw, GitBranch, ArrowUpRight, Search, FolderGit2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { RefreshCw, GitBranch, Search, FolderGit2 } from "lucide-react";
 import { agoText } from "../cron";
 import { Project, Run, useProjects, useMaintainerTasks, useMaintainerRuns,
   useMaintainerAction, useRun } from "../maintainer-api";
@@ -159,15 +159,13 @@ export default function Maintainer() {
     action.mutate({ path: "/projects/refresh", body: options });
   const select = (id: string) => setParams({ tab: "projects", project: id });
 
-  return <div className="maintainer-page">
-    <header className="mi-header"><div><p className="eyebrow">Engineering workspace</p>
-      <h1>Maintainer</h1><p>Repository facts, versions and work that needs attention.</p></div>
-      <Link to="/agents/maintainer">Agent schedule <ArrowUpRight size={14} /></Link></header>
+  return <div className="maintainer-workspace">
     <div className="mi-toolbar">
       <button className="btn" disabled={action.isPending} onClick={() => inspect({})}><RefreshCw size={14} /> Inspect projects</button>
       <button className="btn" disabled={action.isPending} onClick={() => inspect({ remote: true })}>Verify remotes</button>
       <button className="btn" disabled={action.isPending} onClick={() => inspect({ discover: true })}><FolderGit2 size={14} /> Discover projects</button>
       <span className="mi-meta">{data?.refresh ? `${data.refresh.value} · ${agoText(data.refresh.at)}` : "No inspection recorded"}</span>
+      <a href="#agent-schedule" className="mi-meta">Schedule and activity ↓</a>
     </div>
     {action.isError && <p className="mi-error" role="alert">{action.error.message}</p>}
     {action.isSuccess && <p role="status" className="mi-meta">Request accepted. Observations update automatically below.</p>}

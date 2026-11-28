@@ -24,7 +24,6 @@ import {
 import {
   InboxItem,
   Job,
-  MaintainerRun,
   MemoryPrompt,
   MemorySaveResult,
   MemoryStats,
@@ -37,6 +36,7 @@ import {
 } from "../api";
 import { DiffBlock, Loading } from "../components/bits";
 import { ShiftStrip } from "../components/shift";
+import Maintainer from "./Maintainer";
 import { agoText, describeCron, untilText } from "../cron";
 import "./agent-detail.css";
 
@@ -52,15 +52,6 @@ const ICONS: Record<string, LucideIcon> = {
 
 const inr = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
-
-/** A run's one-line verdict: the diffstat when it stands up, the reason when it doesn't. */
-function runVerdict(r: MaintainerRun) {
-  if (r.status === "failed") return { tone: "failed", text: r.error || "failed" };
-  if (r.verify === "failed") return { tone: "failed", text: "build failed" };
-  if (r.verify === "blocked") return { tone: "idle", text: "verification unavailable" };
-  if (r.files_changed === 0) return { tone: "idle", text: "no change needed" };
-  return { tone: "ok", text: `+${r.insertions} −${r.deletions} in ${r.files_changed} files` };
-}
 
 function runState(job: Job) {
   if (job.running_since) return { tone: "busy", text: "running" };
@@ -341,10 +332,6 @@ export default function AgentDetail() {
   const entities = data.entities ?? [];
   const mail = data.mail ?? [];
   const mailer = data.mailer;
-  const maintainer = data.maintainer;
-  const queue = (data.queue ?? []).filter((t) => t.status === "proposed");
-  const prs = data.prs ?? [];
-  const codeRuns = data.runs ?? [];
   const treasurer = data.treasurer;
   const finance = data.finance_snapshot;
   const financeInsights = data.finance_insights ?? [];
@@ -401,6 +388,8 @@ export default function AgentDetail() {
         </div>
       </section>
 
+      {agent.name === "maintainer" && <Maintainer />}
+
       {agent.name === "curator" && (
         <MemoryInterview prompt={data.memory_prompt} stats={data.memory_stats} />
       )}
@@ -416,13 +405,6 @@ export default function AgentDetail() {
           <CircleAlert size={14} /> Sending from your own address to your own address, so Gmail
           files these as mail you sent yourself. Give Herald its own Google account
           (GMAIL_SENDER_ADDRESS) to fix that.
-        </p>
-      )}
-
-      {maintainer && (
-        <p className="ap-blocked">
-          <CircleAlert size={14} /> {maintainer.reason}{" "}
-          <Link to="/maintainer">Open the engineering workspace ↗</Link>
         </p>
       )}
 
@@ -550,7 +532,7 @@ export default function AgentDetail() {
         </>
       )}
 
-      <h2 className="ap-section">
+      <h2 className="ap-section" id="agent-schedule">
         Passes <span className="count-pill">{jobs.length}</span>
       </h2>
       <div className="pass-list">
@@ -681,93 +663,6 @@ export default function AgentDetail() {
                 so, and mail cannot be recalled afterwards.
               </p>
             )}
-          </div>
-        </>
-      )}
-
-      {prs.length > 0 && (
-        <>
-          <h2 className="ap-section">
-            Pull requests waiting on you <span className="count-pill alert">{prs.length}</span>
-            <span className="ap-section-note">Orion cannot merge — that stays your hand</span>
-          </h2>
-          <div className="card">
-            <ul className="pr-list">
-              {prs.map((r) => {
-                const v = runVerdict(r);
-                return (
-                  <li className="pr-row" key={r.id}>
-                    <span className={`pr-state pv-${v.tone}`}>{r.repo}</span>
-                    <a className="pr-title" href={r.pr_url ?? "#"} target="_blank" rel="noreferrer">
-                      {r.title} <ExternalLink size={11} />
-                    </a>
-                    <i className="leader" />
-                    <span className="pr-stat">{v.text}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </>
-      )}
-
-      {queue.length > 0 && (
-        <>
-          <h2 className="ap-section">
-            Preserved proposals <span className="count-pill alert">{queue.length}</span>
-            <Link to="/maintainer?tab=proposals" className="btn btn-sm btn-ghost ap-section-act">
-              review proposals <ExternalLink size={12} />
-            </Link>
-          </h2>
-          <div className="card">
-            <ul className="q-list">
-              {queue.slice(0, 10).map((t) => (
-                <li key={t.id} className="q-item">
-                  <span className="q-subject">
-                    {t.repo} · {t.risk} risk
-                  </span>
-                  <p className="q-text">
-                    <b>{t.title}</b>
-                    {t.rationale ? ` — ${t.rationale}` : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="registry-hint">
-              Nothing here has run. Approving one hands it to Codex on your own machine, in
-              a throwaway worktree, and opens a pull request you review on GitHub.
-            </p>
-          </div>
-        </>
-      )}
-
-      {codeRuns.length > 0 && (
-        <>
-          <h2 className="ap-section">
-            The work log <span className="count-pill">{codeRuns.length}</span>
-          </h2>
-          <div className="card">
-            <ul className="mail-log">
-              {codeRuns.map((r) => {
-                const v = runVerdict(r);
-                return (
-                  <li className="mail-row" key={r.id}>
-                    <span className={`mail-state ms-${v.tone === "ok" ? "sent" : v.tone}`}>
-                      {r.repo}
-                    </span>
-                    <span className="mail-subject" title={r.summary || undefined}>
-                      {r.title}
-                    </span>
-                    <i className="leader" />
-                    <span className="pr-stat">{v.text}</span>
-                    <time className="mail-time">
-                      {agoText(r.ended_at ?? r.started_at)}
-                      {r.duration_s ? ` · ${Math.round(r.duration_s / 60)}m` : ""}
-                    </time>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
         </>
       )}

@@ -7,7 +7,6 @@ import {
   MessagesSquare,
   History,
   Settings,
-  FolderGit2,
 } from "lucide-react";
 import { useInbox } from "../api";
 import Telemetry from "./Telemetry";
@@ -18,7 +17,6 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/inbox", label: "Inbox", icon: InboxIcon },
   { to: "/agents", label: "Agents", icon: Bot },
-  { to: "/maintainer", label: "Maintainer", icon: FolderGit2 },
   { to: "/chat", label: "Chat", icon: MessagesSquare },
   { to: "/sessions", label: "Sessions", icon: History },
 ];

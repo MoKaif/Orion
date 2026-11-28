@@ -55,7 +55,7 @@ def register() -> None:
         "maintainer", "Maintainer",
         tagline="Engineering",
         blurb="Tracks project configuration, Git synchronization, versions and development "
-              "toolchains. Open Maintainer in the sidebar for the project workspace. "
+              "toolchains in this agent's project workspace. "
               "Automatic development is paused while revision-bound approvals are built.",
         icon="git-pull-request", accent="idea", plugin="maintainer", order=40,
         summary=_summary, detail=_detail)

@@ -156,7 +156,11 @@ state, the project API returns 21 records with execution disabled, and Caddy ser
 against the live API. Verification: 97 Python tests, TypeScript/Vite production build, and
 live smoke checks (six pass, one optional unconfigured Gemini warning, zero failures).
 
-To inspect: open the workspace, select a project for Git/version/environment evidence, then
+To inspect: open **Agents → Maintainer** (`/agents/maintainer`), select a project for Git/version/environment evidence, then
 use Attention, Releases, Proposals or Executions. Inspect projects reads local state; Verify
 remotes checks branch tips; Discover projects onboards new Git roots only beneath the configured
 workspace. Development changes are recorded as unreleased; no release tag was created.
+
+Navigation correction (2026-11-28): the workspace is embedded in the Maintainer agent page,
+with the existing summary/schedule/activity. The separate sidebar item and duplicate legacy
+panels were removed. Old `/maintainer` bookmarks redirect while preserving section/project selection.
